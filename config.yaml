@@ -1,0 +1,38 @@
+localega:
+  token: 
+  # Username to identify the user in CentralEGA
+  user: dummy
+  # User secret private RSA key.
+  user_key: /config/dummy.key
+  # Public key file to encrypt file.
+  encrypt_key_public: /config/key.1.pub
+  # Private key file to encrypt file.
+  encrypt_key_private: /config/key.1.sec
+  # Private key password.
+  encrypt_key_pass: 
+  # Inbox address, or service name
+  inbox_address: localega-inbox
+  # Inbox port
+  inbox_port: 2222
+  # S3 address, or service name, should include port number
+  s3_address: 
+  s3_access: 
+  s3_secret: 
+  s3_region: lega
+  s3_bucket: lega
+  # CentralEGA Message Broker address
+  cm_address: 
+  cm_port: 5672
+  # CentralEGA Message Broker Country specific details
+  cm_user: 
+  cm_vhost: 
+  cm_pass: 
+  # RES address or service name with port
+  res_address: localega-res:9090
+  # DataEdge address or service name with port
+  dataedge_address: localega-dataedge:9059
+  # DB address, port will be assumed 5432
+  db_address: localega-db
+  db_user: lega
+  db_name: lega
+  db_pass: 
