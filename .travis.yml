@@ -1,0 +1,49 @@
+---
+# We need the systemd for the kubeadm and it's default from 16.04+
+dist: xenial
+language: minimal
+
+services:
+- docker
+env:
+  global:
+  - VERSION=$TRAVIS_TAG
+  - VCS_SOURCE="https://github.com/${TRAVIS_REPO_SLUG}"
+  - export DOCKER_REPO=$(echo $TRAVIS_REPO_SLUG | tr '[:upper:]' '[:lower:]')
+before_script:
+- docker pull "$DOCKER_REPO" || true
+
+script:
+- |
+  if [ -n "${TRAVIS_TAG}" ]; then
+    VERSION=$TRAVIS_COMMIT
+  fi
+- |
+  docker build --pull --cache-from "$DOCKER_REPO" \
+  --label="org.label-schema.build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --label="org.label-schema.schema-version=1.0" \
+  --label="org.label-schema.vcs-url=${VCS_SOURCE}" \
+  --label="org.label-schema.version=${VERSION}" \
+  --label="org.label-schema.vcs-ref=${TRAVIS_COMMIT}" \
+  --tag ${DOCKER_REPO} .
+
+before_deploy:
+- docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+- |
+  if [ "${TRAVIS_TAG}" ]; then
+    docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:${TRAVIS_TAG}"
+  fi
+- docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:latest"
+- docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:${TRAVIS_COMMIT}"
+- docker images
+deploy:
+  provider: script
+  script: 
+  - |
+    if [ "${TRAVIS_TAG}" ]; then
+      docker push "${DOCKER_REPO}:${TRAVIS_TAG}"
+    fi
+    docker push "${DOCKER_REPO}:latest"
+    docker push "${DOCKER_REPO}:${TRAVIS_COMMIT}"
+  on:
+    branch: master
