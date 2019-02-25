@@ -1,0 +1,9 @@
+cryptography
+PGPy==0.4.3
+pika
+paramiko
+minio
+PyYAML
+requests
+git+https://github.com/NBISweden/LocalEGA-cryptor.git
+asyncpg
