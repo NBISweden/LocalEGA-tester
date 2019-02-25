@@ -38,12 +38,6 @@ before_deploy:
 - docker images
 deploy:
   provider: script
-  script: 
-  - |
-    if [ "${TRAVIS_TAG}" ]; then
-      docker push "${DOCKER_REPO}:${TRAVIS_TAG}"
-    fi
-    docker push "${DOCKER_REPO}:latest"
-    docker push "${DOCKER_REPO}:${TRAVIS_COMMIT}"
+  script: /bin/bash deploy.sh
   on:
     branch: master
