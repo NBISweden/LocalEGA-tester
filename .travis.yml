@@ -16,7 +16,7 @@ before_script:
 script:
 - |
   if [ -n "${TRAVIS_TAG}" ]; then
-    VERSION=$TRAVIS_COMMIT
+    VERSION=${TRAVIS_COMMIT::6}
   fi
 - |
   docker build --pull --cache-from "$DOCKER_REPO" \
@@ -34,7 +34,7 @@ before_deploy:
     docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:${TRAVIS_TAG}"
   fi
 - docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:latest"
-- docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:${TRAVIS_COMMIT}"
+- docker tag "${DOCKER_REPO}" "${DOCKER_REPO}:${TRAVIS_COMMIT::6}"
 - docker images
 deploy:
   provider: script
