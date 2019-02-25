@@ -17,6 +17,7 @@ import filecmp
 import asyncio
 import asyncpg
 import yaml
+from urllib.parse import urlparse
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -177,9 +178,19 @@ def encrypt_file(file_path, pubkey):
     return (output_file, c4ga_md5)
 
 
+def strip_scheme(url):
+    """Remove scheme from url.
+
+    Used to remove scheme from S3 address.
+    """
+    parsed = urlparse(url)
+    scheme = "%s://" % parsed.scheme
+    return parsed.geturl().replace(scheme, '', 1)
+
+
 def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, secret):
     """Check if there is a file inside s3."""
-    minioClient = Minio(minio_address, access_key=access, secret_key=secret,
+    minioClient = Minio(strip_scheme(minio_address), access_key=access, secret_key=secret,
                         region=region_name, secure=False)
     LOG.info(f'Connected to S3: {minio_address}.')
     # List all object paths in bucket that begin with my-prefixname.
@@ -187,10 +198,10 @@ def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, se
     object_list = [obj.object_name for obj in objects]
     assert str(file_id) in object_list, f"Could not find the file just uploaded!"
     LOG.info(f"Found the file uploaded to inbox as {file_id} in S3Storage.")
-    all_objects = minioClient.list_objects(bucket_name, recursive=True)
-    LOG.info("All the files in Lega bucket: ")
-    for obj in all_objects:
-        LOG.info(f'Found ingested file: {obj.object_name} of size: {obj.size}.')
+    # all_objects = minioClient.list_objects(bucket_name, recursive=True)
+    # LOG.info("All the files in Lega bucket: ")
+    # for obj in all_objects:
+    #     LOG.info(f'Found ingested file: {obj.object_name} of size: {obj.size}.')
 
 
 def main():
