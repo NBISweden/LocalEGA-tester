@@ -33,8 +33,13 @@ async def get_last_id(db_user, db_name, db_pass, db_host):
     conn = await asyncpg.connect(user=db_user, password=db_pass,
                                  database=db_name, host=db_host)
     values = await conn.fetchrow('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
-    LOG.debug(f"Database ID: {values['id']}")
-    return values['id']
+    if (values is None):
+        LOG.debug(f'Database is empty')
+        return 0
+    else:
+        LOG.debug(f"Database ID: {values['id']}")
+        return values['id']
+
     await conn.close()
 
 async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
@@ -282,6 +287,9 @@ def main():
     test_user = config['user']
     # TEST Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
+    # Get current id from database
+    current_id = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address']))
+    LOG.debug(f'Current last DB id {current_id}')
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
     # Retrieve session_key and IV to test RES
@@ -302,8 +310,11 @@ def main():
         # Once the file has been ingested it should be the last ID in the database
         # We use this ID everywhere including donwload from DataEdge
         # In future versions once we fix DB schema we will use StableID for download
-        fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
-                                                     config['db_pass'], config['db_address']))
+        fileID = 0
+        while (fileID <= current_id):
+            time.sleep(1)
+            fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
+                                                         config['db_pass'], config['db_address']))
         # wait for submission to go through
         get_corr(config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
