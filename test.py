@@ -209,7 +209,10 @@ def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, se
 
 def download_to_file(service, payload, output, headers=None):
     """Download file from service and write to file."""
-    download = requests.get(service, params=payload, headers=headers)
+    if headers:
+        download = requests.get(service, params=payload, headers=headers)
+    else:
+        download = requests.get(service, params=payload)
     # We are using filecmp thus we will write content to file
     assert download.status_code == 200, f'We got a status that is not OK {download.status_code} | FAIL |'
     LOG.info(f"File downloaded from {service}. | PASS |")
@@ -228,6 +231,10 @@ def compare_files(service, downloaded_file, used_file):
     #         if f1.read() == f2.read():
     #             pass
     LOG.info(f'{service} Downloaded file is equal to the original file. | PASS |')
+    if os.path.isfile(downloaded_file):
+        os.remove(downloaded_file)
+    else:
+        LOG.error(f"Error: %s file not found {downloaded_file}")
 
 
 def main():
@@ -240,6 +247,7 @@ def main():
 
     args = parser.parse_args()
     used_file = os.path.expanduser(args.input)
+    filename, _ = os.path.splitext(used_file)
     config_file = os.path.expanduser(args.config)
 
     with open(config_file, 'r') as stream:
@@ -250,8 +258,8 @@ def main():
 
     # Initialise what is needed
 
-    res_file = 'res.file'
-    dataedge_file = 'dataedge.file'
+    res_file = f'{filename}.res'
+    dataedge_file = f'{filename}.dataedge'
     config = config_file['localega']
     key_pk = os.path.expanduser(config['user_key'])
     pub_key, _ = pgpy.PGPKey.from_file(os.path.expanduser(config['encrypt_key_public']))
@@ -264,7 +272,7 @@ def main():
 
     test_user = config['user']
     # TEST Connection before anything
-    open_ssh_connection(config['inbox_address'], test_user, key_pk)
+    open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
     # Retrieve session_key and IV to test RES
@@ -287,8 +295,7 @@ def main():
         # In future versions once we fix DB schema we will use StableID for download
         fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
                                                      config['db_pass'], config['db_address']))
-        # wait for submission to go through - might need to be longer depending on the file
-        # proper retry should be implemented
+        # wait for submission to go through
         get_corr(config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
                  port=config['cm_port'])
@@ -322,8 +329,13 @@ def main():
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
     dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{fileID}"
-    download_to_file(dataedge_url, edge_payload, dataedge_file, edge_headers)
+    download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
+
+    if os.path.isfile(f"{filename}.c4ga"):
+        os.remove(f"{filename}.c4ga")
+    else:
+        LOG.error(f"Error: %s file not found {filename}.c4ga")
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
