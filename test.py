@@ -18,6 +18,7 @@ import asyncpg
 import yaml
 from urllib.parse import urlparse
 from retrying import retry
+import time
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -32,10 +33,23 @@ async def get_last_id(db_user, db_name, db_pass, db_host):
     conn = await asyncpg.connect(user=db_user, password=db_pass,
                                  database=db_name, host=db_host)
     values = await conn.fetchrow('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
-    LOG.debug(f"Database ID: {values['id']}")
-    return values['id']
+    if (values is None):
+        LOG.debug(f'Database is empty')
+        return 0
+    else:
+        LOG.debug(f"Database ID: {values['id']}")
+        return values['id']
+
     await conn.close()
 
+async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
+    """Retrieve the last inserted file in the database, indifferent of status."""
+    conn = await asyncpg.connect(user=db_user, password=db_pass,
+                                 database=db_name, host=db_host)
+    status = await conn.fetchrow('''SELECT status FROM local_ega.files where id = $1''', file_id)
+    LOG.debug(f"File status: {status['status']}")
+    return status['status']
+    await conn.close()
 
 async def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
@@ -273,6 +287,9 @@ def main():
     test_user = config['user']
     # TEST Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
+    # Get current id from database
+    current_id = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address']))
+    LOG.debug(f'Current last DB id {current_id}')
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
     # Retrieve session_key and IV to test RES
@@ -293,12 +310,23 @@ def main():
         # Once the file has been ingested it should be the last ID in the database
         # We use this ID everywhere including donwload from DataEdge
         # In future versions once we fix DB schema we will use StableID for download
-        fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
-                                                     config['db_pass'], config['db_address']))
+        fileID = 0
+        while (fileID <= current_id):
+            time.sleep(1)
+            fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
+                                                         config['db_pass'], config['db_address']))
         # wait for submission to go through
         get_corr(config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
                  port=config['cm_port'])
+        # Wait for file status
+        status = ''
+        while (status != 'COMPLETED'):
+            time.sleep(1)
+            status = loop.run_until_complete(get_file_status(config['db_user'], config['db_name'],
+                                                             config['db_pass'], config['db_address'],
+                                                             fileID))
+
         # Stable ID should be sent by CentralEGA
         submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'file_id': fileID, 'stable_id': f'EGAF{stableID}'}, 'stableIDs',
