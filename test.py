@@ -35,12 +35,12 @@ async def get_last_id(db_user, db_name, db_pass, db_host):
     values = await conn.fetchrow('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
     if (values is None):
         LOG.debug(f'Database is empty')
+        await conn.close()
         return 0
     else:
         LOG.debug(f"Database ID: {values['id']}")
+        await conn.close()
         return values['id']
-
-    await conn.close()
 
 async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     """Retrieve the last inserted file in the database, indifferent of status."""
@@ -48,8 +48,8 @@ async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
                                  database=db_name, host=db_host)
     status = await conn.fetchrow('''SELECT status FROM local_ega.files where id = $1''', file_id)
     LOG.debug(f"File status: {status['status']}")
-    return status['status']
     await conn.close()
+    return status['status']
 
 async def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
