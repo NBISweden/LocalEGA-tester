@@ -322,7 +322,7 @@ def main():
         # Wait for file status
         status = ''
         while (status != 'COMPLETED'):
-            time.sleep(1)
+            time.sleep(5)
             status = loop.run_until_complete(get_file_status(config['db_user'], config['db_name'],
                                                              config['db_pass'], config['db_address'],
                                                              fileID))
@@ -367,7 +367,7 @@ def main():
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
-    LOG.debug('Should be all!')
+    LOG.info('Should be all!')
 
 
 if __name__ == '__main__':
