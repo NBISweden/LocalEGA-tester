@@ -13,8 +13,7 @@ import argparse
 from minio import Minio
 import requests
 import filecmp
-import asyncio
-import asyncpg
+import psycopg2
 import yaml
 from urllib.parse import urlparse
 from retrying import retry
@@ -28,11 +27,13 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-async def get_last_id(db_user, db_name, db_pass, db_host):
+def get_last_id(db_user, db_name, db_pass, db_host):
     """Retrieve the last inserted file in the database, indifferent of status."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    values = await conn.fetchrow('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
+    values = cursor.fetchone()
     if (values is None):
         LOG.debug(f'Database is empty')
         await conn.close()
@@ -42,25 +43,38 @@ async def get_last_id(db_user, db_name, db_pass, db_host):
         await conn.close()
         return values['id']
 
-async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
+    cursor.close()
+    conn.close()
+
+
+def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     """Retrieve the last inserted file in the database, indifferent of status."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    status = await conn.fetchrow('''SELECT status FROM local_ega.files where id = $1''', file_id)
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT status FROM local_ega.files where id = $1''', file_id)
+    status = cursor.fetchone()
     LOG.debug(f"File status: {status['status']}")
-    await conn.close()
     return status['status']
 
-async def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
+    cursor.close()
+    conn.close()
+
+
+def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    last_index = await conn.fetchrow('''select id from local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
-    await conn.execute('''
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    cursor = conn.cursor()
+    cursor.execute('''select id from local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
+    last_index = cursor.fetchone()
+    conn.execute('''
         INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES($1, $2, $3)
     ''', last_index['id'] + 1 if last_index else 1, file_id, dataset_id)
     LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
-    await conn.close()
+
+    cursor.close()
+    conn.close()
 
 
 def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222):
@@ -278,7 +292,6 @@ def main():
     key_pk = os.path.expanduser(config['user_key'])
     pub_key, _ = pgpy.PGPKey.from_file(os.path.expanduser(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
-    loop = asyncio.get_event_loop()
     session_key = ''
     iv = ''
     fileID = ''
@@ -288,7 +301,7 @@ def main():
     # TEST Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
     # Get current id from database
-    current_id = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address']))
+    current_id = get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address'])
     LOG.debug(f'Current last DB id {current_id}')
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
@@ -313,8 +326,8 @@ def main():
         fileID = 0
         while (fileID <= current_id):
             time.sleep(1)
-            fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
-                                                         config['db_pass'], config['db_address']))
+            fileID = get_last_id(config['db_user'], config['db_name'],
+                                 config['db_pass'], config['db_address'])
         # wait for submission to go through
         get_corr(config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
@@ -322,10 +335,10 @@ def main():
         # Wait for file status
         status = ''
         while (status != 'COMPLETED'):
-            time.sleep(5)
-            status = loop.run_until_complete(get_file_status(config['db_user'], config['db_name'],
-                                                             config['db_pass'], config['db_address'],
-                                                             fileID))
+            time.sleep(1)
+            status = get_file_status(config['db_user'], config['db_name'],
+                                     config['db_pass'], config['db_address'],
+                                     fileID)
 
         # Stable ID should be sent by CentralEGA
         submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
@@ -348,9 +361,9 @@ def main():
     # Thus we need this step
     # for now this dataset ID is fixed to 'EGAD01' as we have it like this in the TOKEN
     # Will need updating once we decide on the permissions handling
-    loop.run_until_complete(file2dataset_map(config['db_user'], config['db_name'],
-                                             config['db_pass'], config['db_address'],
-                                             fileID, 'EGAD01'))
+    file2dataset_map(config['db_user'], config['db_name'],
+                     config['db_pass'], config['db_address'],
+                     fileID, 'EGAD01')
 
     # Verify that the file can be downloaded from DataEdge
     # We are using a token that can be validated by DataEdge
