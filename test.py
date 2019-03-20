@@ -117,9 +117,9 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         transport.close()
 
 
-def submit_cega(address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
+def submit_cega(protocol, address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
     """Submit message to CEGA along with."""
-    mq_address = f'amqp://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
     try:
         parameters = pika.URLParameters(mq_address)
         connection = pika.BlockingConnection(parameters)
@@ -138,9 +138,9 @@ def submit_cega(address, user, vhost, message, routing_key, mq_password, correla
 
 
 @retry(stop_max_attempt_number=10)
-def get_corr(address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
+def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
-    mq_address = f'amqp://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
     parameters = pika.URLParameters(mq_address)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
@@ -296,6 +296,7 @@ def main():
     iv = ''
     fileID = ''
     token = config['token']
+    cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
 
     test_user = config['user']
     # TEST Connection before anything
@@ -314,10 +315,10 @@ def main():
     stableID = ''.join(secrets.choice(string.digits) for i in range(16))
     if c4ga_md5:
         sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
-        correlation_id = get_corr(config['cm_address'], config['cm_user'],
+        correlation_id = get_corr(cm_protocol, config['cm_address'], config['cm_user'],
                                   config['cm_vhost'], 'v1.files.inbox', test_file, config['cm_pass'],
                                   port=config['cm_port'])
-        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'user': test_user, 'filepath': test_file}, 'files',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         # Once the file has been ingested it should be the last ID in the database
@@ -329,7 +330,7 @@ def main():
             fileID = get_last_id(config['db_user'], config['db_name'],
                                  config['db_pass'], config['db_address'])
         # wait for submission to go through
-        get_corr(config['cm_address'], config['cm_user'],
+        get_corr(cm_protocol, config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
                  port=config['cm_port'])
         # Wait for file status
@@ -341,7 +342,7 @@ def main():
                                      fileID)
 
         # Stable ID should be sent by CentralEGA
-        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'file_id': fileID, 'stable_id': f'EGAF{stableID}'}, 'stableIDs',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         list_s3_objects(config['s3_address'], config['s3_region'],
