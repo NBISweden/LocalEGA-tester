@@ -33,15 +33,14 @@ def get_last_id(db_user, db_name, db_pass, db_host):
                             database=db_name, host=db_host)
     cursor = conn.cursor()
     cursor.execute('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
-    values = cursor.fetchone()
+    values = cursor.fetchone()[1]
     if (values is None):
         LOG.debug(f'Database is empty')
         await conn.close()
         return 0
     else:
-        LOG.debug(f"Database ID: {values['id']}")
-        await conn.close()
-        return values['id']
+        LOG.debug(f"Database ID: {values}")
+        return values
 
     cursor.close()
     conn.close()
@@ -53,9 +52,9 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
                             database=db_name, host=db_host)
     cursor = conn.cursor()
     cursor.execute('''SELECT status FROM local_ega.files where id = $1''', file_id)
-    status = cursor.fetchone()
-    LOG.debug(f"File status: {status['status']}")
-    return status['status']
+    status = cursor.fetchone()[0]
+    LOG.debug(f"File status: {status}")
+    return status
 
     cursor.close()
     conn.close()
@@ -67,10 +66,10 @@ def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
                             database=db_name, host=db_host)
     cursor = conn.cursor()
     cursor.execute('''select id from local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
-    last_index = cursor.fetchone()
+    last_index = cursor.fetchone()[0]
     conn.execute('''
         INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES($1, $2, $3)
-    ''', last_index['id'] + 1 if last_index else 1, file_id, dataset_id)
+    ''', last_index + 1 if last_index else 1, file_id, dataset_id)
     LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
 
     cursor.close()
