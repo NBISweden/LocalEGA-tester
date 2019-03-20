@@ -5,7 +5,7 @@ LABEL org.label-schema.schema-version="1.0"
 
 ADD requirements.txt .
 
-RUN apk add --no-cache git postgresql-dev gcc musl-dev libffi-dev make gnupg && \
+RUN apk add --no-cache git postgresql-libs postgresql-dev gcc musl-dev libffi-dev make gnupg && \
     pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt && \
     rm -rf /root/.cache/pip && \

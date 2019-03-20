@@ -21,6 +21,7 @@ localega:
   s3_region: lega
   s3_bucket: lega
   # CentralEGA Message Broker address
+  cm_ssl: false
   cm_address:
   cm_port: 5672
   # CentralEGA Message Broker Country specific details

@@ -13,8 +13,7 @@ import argparse
 from minio import Minio
 import requests
 import filecmp
-import asyncio
-import asyncpg
+import psycopg2
 import yaml
 from urllib.parse import urlparse
 from retrying import retry
@@ -28,39 +27,54 @@ LOG = logging.getLogger(__name__)
 LOG.setLevel(logging.INFO)
 
 
-async def get_last_id(db_user, db_name, db_pass, db_host):
+def get_last_id(db_user, db_name, db_pass, db_host):
     """Retrieve the last inserted file in the database, indifferent of status."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    values = await conn.fetchrow('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    cursor = conn.cursor()
+    cursor.execute('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
+    values = cursor.fetchone()[1]
     if (values is None):
         LOG.debug(f'Database is empty')
-        await conn.close()
+        cursor.close()
+        conn.close()
         return 0
     else:
-        LOG.debug(f"Database ID: {values['id']}")
-        await conn.close()
-        return values['id']
+        LOG.debug(f"Database ID: {values}")
+        cursor.close()
+        conn.close()
+        return values
 
-async def get_file_status(db_user, db_name, db_pass, db_host, file_id):
+
+def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     """Retrieve the last inserted file in the database, indifferent of status."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    status = await conn.fetchrow('''SELECT status FROM local_ega.files where id = $1''', file_id)
-    LOG.debug(f"File status: {status['status']}")
-    await conn.close()
-    return status['status']
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    cursor = conn.cursor()
+    cursor.execute('SELECT status FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
+    status = cursor.fetchone()[0]
+    LOG.debug(f"File status: {status}")
+    return status
 
-async def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
+    cursor.close()
+    conn.close()
+
+
+def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
-    conn = await asyncpg.connect(user=db_user, password=db_pass,
-                                 database=db_name, host=db_host)
-    last_index = await conn.fetchrow('''select id from local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
-    await conn.execute('''
-        INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES($1, $2, $3)
-    ''', last_index['id'] + 1 if last_index else 1, file_id, dataset_id)
-    LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
-    await conn.close()
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host)
+    last_index = None
+    with conn.cursor() as cursor:
+        cursor.execute('''SELECT id FROM local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
+        value = cursor.fetchone()
+        last_index = value[0] if value is not None else 0
+    with conn.cursor() as cursor:
+        cursor.execute('INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES(%(last_index)s, %(file_id)s, %(dataset_id)s)',
+                       {"last_index": last_index + 1 if last_index is not None else 1, "file_id": file_id, "dataset_id": dataset_id})
+        LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
+        conn.commit()
+    conn.close()
 
 
 def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222):
@@ -103,9 +117,9 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         transport.close()
 
 
-def submit_cega(address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
+def submit_cega(protocol, address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
     """Submit message to CEGA along with."""
-    mq_address = f'amqp://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
     try:
         parameters = pika.URLParameters(mq_address)
         connection = pika.BlockingConnection(parameters)
@@ -124,9 +138,9 @@ def submit_cega(address, user, vhost, message, routing_key, mq_password, correla
 
 
 @retry(stop_max_attempt_number=10)
-def get_corr(address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
+def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
-    mq_address = f'amqp://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
     parameters = pika.URLParameters(mq_address)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
@@ -278,17 +292,17 @@ def main():
     key_pk = os.path.expanduser(config['user_key'])
     pub_key, _ = pgpy.PGPKey.from_file(os.path.expanduser(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
-    loop = asyncio.get_event_loop()
     session_key = ''
     iv = ''
     fileID = ''
     token = config['token']
+    cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
 
     test_user = config['user']
     # TEST Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
     # Get current id from database
-    current_id = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address']))
+    current_id = get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address'])
     LOG.debug(f'Current last DB id {current_id}')
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
@@ -301,10 +315,10 @@ def main():
     stableID = ''.join(secrets.choice(string.digits) for i in range(16))
     if c4ga_md5:
         sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
-        correlation_id = get_corr(config['cm_address'], config['cm_user'],
+        correlation_id = get_corr(cm_protocol, config['cm_address'], config['cm_user'],
                                   config['cm_vhost'], 'v1.files.inbox', test_file, config['cm_pass'],
                                   port=config['cm_port'])
-        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'user': test_user, 'filepath': test_file}, 'files',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         # Once the file has been ingested it should be the last ID in the database
@@ -313,22 +327,22 @@ def main():
         fileID = 0
         while (fileID <= current_id):
             time.sleep(1)
-            fileID = loop.run_until_complete(get_last_id(config['db_user'], config['db_name'],
-                                                         config['db_pass'], config['db_address']))
+            fileID = get_last_id(config['db_user'], config['db_name'],
+                                 config['db_pass'], config['db_address'])
         # wait for submission to go through
-        get_corr(config['cm_address'], config['cm_user'],
+        get_corr(cm_protocol, config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
                  port=config['cm_port'])
         # Wait for file status
         status = ''
         while (status != 'COMPLETED'):
-            time.sleep(5)
-            status = loop.run_until_complete(get_file_status(config['db_user'], config['db_name'],
-                                                             config['db_pass'], config['db_address'],
-                                                             fileID))
+            time.sleep(1)
+            status = get_file_status(config['db_user'], config['db_name'],
+                                     config['db_pass'], config['db_address'],
+                                     fileID)
 
         # Stable ID should be sent by CentralEGA
-        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'file_id': fileID, 'stable_id': f'EGAF{stableID}'}, 'stableIDs',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         list_s3_objects(config['s3_address'], config['s3_region'],
@@ -348,9 +362,9 @@ def main():
     # Thus we need this step
     # for now this dataset ID is fixed to 'EGAD01' as we have it like this in the TOKEN
     # Will need updating once we decide on the permissions handling
-    loop.run_until_complete(file2dataset_map(config['db_user'], config['db_name'],
-                                             config['db_pass'], config['db_address'],
-                                             fileID, 'EGAD01'))
+    file2dataset_map(config['db_user'], config['db_name'],
+                     config['db_pass'], config['db_address'],
+                     fileID, 'EGAD01')
 
     # Verify that the file can be downloaded from DataEdge
     # We are using a token that can be validated by DataEdge
