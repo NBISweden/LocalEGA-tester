@@ -51,7 +51,7 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     conn = psycopg2.connect(user=db_user, password=db_pass,
                             database=db_name, host=db_host)
     cursor = conn.cursor()
-    cursor.execute('''SELECT status FROM local_ega.files where id = $1''', file_id)
+    cursor.execute('SELECT status FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
     status = cursor.fetchone()[0]
     LOG.debug(f"File status: {status}")
     return status
@@ -64,15 +64,16 @@ def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
     conn = psycopg2.connect(user=db_user, password=db_pass,
                             database=db_name, host=db_host)
-    cursor = conn.cursor()
-    cursor.execute('''select id from local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
-    last_index = cursor.fetchone()[0]
-    conn.execute('''
-        INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES($1, $2, $3)
-    ''', last_index + 1 if last_index else 1, file_id, dataset_id)
-    LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
-
-    cursor.close()
+    last_index = None
+    with conn.cursor() as cursor:
+        cursor.execute('''SELECT id FROM local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
+        value = cursor.fetchone()
+        last_index = value[0] if value is not None else 0
+    with conn.cursor() as cursor:
+        cursor.execute('INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES(%(last_index)s, %(file_id)s, %(dataset_id)s)',
+                       {"last_index": last_index + 1 if last_index is not None else 1, "file_id": file_id, "dataset_id": dataset_id})
+        LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
+        conn.commit()
     conn.close()
 
 
