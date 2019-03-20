@@ -36,14 +36,14 @@ def get_last_id(db_user, db_name, db_pass, db_host):
     values = cursor.fetchone()[1]
     if (values is None):
         LOG.debug(f'Database is empty')
-        await conn.close()
+        cursor.close()
+        conn.close()
         return 0
     else:
         LOG.debug(f"Database ID: {values}")
+        cursor.close()
+        conn.close()
         return values
-
-    cursor.close()
-    conn.close()
 
 
 def get_file_status(db_user, db_name, db_pass, db_host, file_id):
