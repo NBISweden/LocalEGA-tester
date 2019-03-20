@@ -62,15 +62,15 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
 
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
-    conn = psycopg2.connect(user=db_user, password=db_pass,
+    conn = psycopg2.connect(user='lega_out', password=db_pass,
                             database=db_name, host=db_host)
     last_index = None
     with conn.cursor() as cursor:
-        cursor.execute('''SELECT id FROM local_ega.file2dataset ORDER BY id DESC LIMIT 1''')
+        cursor.execute('''SELECT id FROM local_ega_ebi.filedataset ORDER BY id DESC LIMIT 1''')
         value = cursor.fetchone()
         last_index = value[0] if value is not None else 0
     with conn.cursor() as cursor:
-        cursor.execute('INSERT INTO local_ega.file2dataset(id, file_id, dataset_id) VALUES(%(last_index)s, %(file_id)s, %(dataset_id)s)',
+        cursor.execute('INSERT INTO local_ega_ebi.filedataset(id, file_id, dataset_stable_id) VALUES(%(last_index)s, %(file_id)s, %(dataset_id)s)',
                        {"last_index": last_index + 1 if last_index is not None else 1, "file_id": file_id, "dataset_id": dataset_id})
         LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
         conn.commit()
@@ -371,7 +371,7 @@ def main():
     # We are using a token that can be validated by DataEdge
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
-    dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{fileID}"
+    dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/EGAF{stableID}"
     download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
 
