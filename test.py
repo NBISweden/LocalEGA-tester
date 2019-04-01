@@ -33,7 +33,7 @@ def get_last_id(db_user, db_name, db_pass, db_host):
                             database=db_name, host=db_host)
     cursor = conn.cursor()
     cursor.execute('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
-    values = cursor.fetchone()[1]
+    values = cursor.fetchone()
     if (values is None):
         LOG.debug(f'Database is empty')
         cursor.close()
@@ -43,7 +43,7 @@ def get_last_id(db_user, db_name, db_pass, db_host):
         LOG.debug(f"Database ID: {values}")
         cursor.close()
         conn.close()
-        return values
+        return values[1]
 
 
 def get_file_status(db_user, db_name, db_pass, db_host, file_id):
