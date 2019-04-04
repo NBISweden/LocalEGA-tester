@@ -76,6 +76,7 @@ def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
         conn.commit()
     conn.close()
 
+
 @retry(stop_max_attempt_number=10, wait_fixed=200)
 def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222):
     """Open an ssh connection, test function."""
@@ -280,7 +281,7 @@ def main():
 
     with open(config_file, 'r') as stream:
         try:
-            config_file = yaml.load(stream)
+            config_file = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             LOG.error(exc)
 
