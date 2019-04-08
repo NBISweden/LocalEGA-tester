@@ -62,7 +62,7 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
 
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
-    conn = psycopg2.connect(user='lega_out', password=db_pass,
+    conn = psycopg2.connect(user=db_user, password=db_pass,
                             database=db_name, host=db_host)
     last_index = None
     with conn.cursor() as cursor:
@@ -303,7 +303,7 @@ def main():
     # TEST Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
     # Get current id from database
-    current_id = get_last_id(config['db_user'], config['db_name'], config['db_pass'], config['db_address'])
+    current_id = get_last_id(config['db_in_user'], config['db_name'], config['db_in_pass'], config['db_address'])
     LOG.debug(f'Current last DB id {current_id}')
     # Encrypt File
     test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
@@ -328,8 +328,8 @@ def main():
         fileID = 0
         while (fileID <= current_id):
             time.sleep(1)
-            fileID = get_last_id(config['db_user'], config['db_name'],
-                                 config['db_pass'], config['db_address'])
+            fileID = get_last_id(config['db_in_user'], config['db_name'],
+                                 config['db_in_pass'], config['db_address'])
         # wait for submission to go through
         get_corr(cm_protocol, config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
@@ -338,8 +338,8 @@ def main():
         status = ''
         while (status != 'COMPLETED'):
             time.sleep(1)
-            status = get_file_status(config['db_user'], config['db_name'],
-                                     config['db_pass'], config['db_address'],
+            status = get_file_status(config['db_in_user'], config['db_name'],
+                                     config['db_in_pass'], config['db_address'],
                                      fileID)
 
         # Stable ID should be sent by CentralEGA
@@ -363,8 +363,8 @@ def main():
     # Thus we need this step
     # for now this dataset ID is fixed to 'EGAD01' as we have it like this in the TOKEN
     # Will need updating once we decide on the permissions handling
-    file2dataset_map(config['db_user'], config['db_name'],
-                     config['db_pass'], config['db_address'],
+    file2dataset_map(config['db_out_user'], config['db_name'],
+                     config['db_out_pass'], config['db_address'],
                      fileID, 'EGAD01')
 
     # Verify that the file can be downloaded from DataEdge

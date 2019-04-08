@@ -36,6 +36,8 @@ localega:
   dataedge_port: 9059
   # DB address, port will be assumed 5432
   db_address: localega-db
-  db_user: lega
+  db_in_user: lega_in
+  db_out_user: lega_out
   db_name: lega
-  db_pass:
+  db_in_pass:
+  db_out_pass:
