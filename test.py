@@ -16,7 +16,7 @@ import filecmp
 import psycopg2
 import yaml
 from urllib.parse import urlparse
-from retrying import retry
+from tenacity import retry, stop_after_delay, wait_fixed
 import time
 
 
@@ -77,7 +77,7 @@ def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     conn.close()
 
 
-@retry(stop_max_attempt_number=10, wait_fixed=200)
+@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
 def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222):
     """Open an ssh connection, test function."""
     try:
@@ -138,7 +138,7 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
         raise e
 
 
-@retry(stop_max_attempt_number=60, wait_fixed=200)
+@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
 def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
     mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
@@ -219,7 +219,7 @@ def strip_scheme(url):
     return parsed.geturl().replace(scheme, '', 1)
 
 
-@retry(stop_max_attempt_number=10, wait_fixed=200)
+@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
 def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, secret):
     """Check if there is a file inside s3."""
     minioClient = Minio(strip_scheme(minio_address), access_key=access, secret_key=secret,
