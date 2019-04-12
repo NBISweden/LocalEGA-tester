@@ -7,4 +7,4 @@ PyYAML
 requests
 git+https://github.com/NBISweden/LocalEGA-cryptor.git
 psycopg2-binary
-retrying
+tenacity
