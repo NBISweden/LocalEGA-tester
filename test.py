@@ -347,8 +347,8 @@ def main():
         submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'file_id': fileID, 'stable_id': stableID}, 'stableIDs',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
-        list_s3_objects(config['s3_address'], config['s3_region'],
-                        config['s3_bucket'], fileID,
+        list_s3_objects(config['s3_address'], config['s3_bucket'],
+                        config['s3_region'], fileID,
                         config['s3_access'], config['s3_secret'])
     LOG.debug('Ingestion DONE')
     LOG.debug('-------------------------------------')
