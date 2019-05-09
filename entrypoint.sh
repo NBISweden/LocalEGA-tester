@@ -1,10 +1,10 @@
 #!/bin/sh
 
-if [ "$1" = 'small' ]; then     
+if [ "$SIZE" = 'small' ]; then
     FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/sequence_read/ERR013140.filt.fastq.gz"
-elif [ "$1" = "medium" ]; then
+elif [ "$SIZE" = "medium" ]; then
     FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/sequence_read/SRR099966_1.filt.fastq.gz"
-elif [ "$1" = "large" ]; then
+elif [ "$SIZE" = "large" ]; then
     FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/alignment/HG00100.mapped.ILLUMINA.bwa.GBR.low_coverage.20130415.bam"
 else
     echo "file size not set"
