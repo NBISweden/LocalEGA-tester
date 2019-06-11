@@ -55,10 +55,9 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     cursor.execute('SELECT status FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
     status = cursor.fetchone()[0]
     LOG.debug(f"File status: {status}")
-    return status
-
     cursor.close()
     conn.close()
+    return status
 
 
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
@@ -109,8 +108,12 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         LOG.debug(f'sftp connected to {hostname}:{port} with {user}')
         sftp = paramiko.SFTPClient.from_transport(transport)
         filename, _ = os.path.splitext(file_path)
-        sftp.put(file_path, f'{filename}.c4ga')
-        LOG.info(f'file uploaded {filename}.c4ga | PASS |')
+        output_base = os.path.basename(filename)
+        if os.path.isfile(file_path):
+            sftp.put(file_path, f'{output_base}.c4ga')
+        else:
+            raise IOError('Could not find localFile {file_path} !!' )
+        LOG.info(f'file uploaded {output_base}.c4ga | PASS |')
     except Exception as e:
         LOG.error(f'Something went wrong {e}')
         raise e
@@ -153,8 +156,8 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, lates
         method_frame, props, body = channel.basic_get(queue=queue)
 
         if method_frame is None or props is None:
-            break
             LOG.error('No message returned')
+            break
 
         message_id = method_frame.delivery_tag
         if message_id in messages:  # we looped
@@ -195,15 +198,14 @@ def encrypt_file(file_path, pubkey):
     """Encrypt file and extract its md5."""
     file_size = os.path.getsize(file_path)
     filename, _ = os.path.splitext(file_path)
-    output_base = os.path.basename(filename)
     c4ga_md5 = None
-    output_file = os.path.expanduser(f'{output_base}.c4ga')
+    output_file = os.path.expanduser(f'{filename}.c4ga')
     infile = open(file_path, 'rb')
     try:
-        encrypt(pubkey, infile, file_size, open(f'{output_base}.c4ga', 'wb'))
-        with open(output_file, 'rb') as read_file:
+        encrypt(pubkey, infile, file_size, open(f'{filename}.c4ga', 'wb'))
+        with open(filename, 'rb') as read_file:
             c4ga_md5 = md5(read_file.read()).hexdigest()
-        LOG.debug(f'File {output_base}.c4ga is the encrypted file with md5: {c4ga_md5}.')
+        LOG.debug(f'File {filename}.c4ga is the encrypted file with md5: {c4ga_md5}.')
     except Exception as e:
         LOG.error(f'Something went wrong {e}')
         raise e
@@ -279,7 +281,7 @@ def main():
     used_file = os.path.expanduser(args.input)
     filename, _ = os.path.splitext(used_file)
     config_file = os.path.expanduser(args.config)
-
+    output_base = os.path.basename(filename)
     with open(config_file, 'r') as stream:
         try:
             config_file = yaml.safe_load(stream)
@@ -318,10 +320,10 @@ def main():
     if c4ga_md5:
         sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
         correlation_id = get_corr(cm_protocol, config['cm_address'], config['cm_user'],
-                                  config['cm_vhost'], 'v1.files.inbox', test_file, config['cm_pass'],
+                                  config['cm_vhost'], 'v1.files.inbox', f'{output_base}.c4ga', config['cm_pass'],
                                   port=config['cm_port'])
         submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
-                    {'user': test_user, 'filepath': test_file}, 'files',
+                    {'user': test_user, 'filepath': f'{output_base}.c4ga'}, 'files',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         # Once the file has been ingested it should be the last ID in the database
         # We use this ID everywhere including donwload from DataEdge
@@ -333,7 +335,7 @@ def main():
                                  config['db_in_pass'], config['db_address'])
         # wait for submission to go through
         get_corr(cm_protocol, config['cm_address'], config['cm_user'],
-                 config['cm_vhost'], 'v1.files.completed', test_file, config['cm_pass'],
+                 config['cm_vhost'], 'v1.files.completed', f'{output_base}.c4ga', config['cm_pass'],
                  port=config['cm_port'])
         # Wait for file status
         status = ''
@@ -375,11 +377,6 @@ def main():
     dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
     download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
-
-    if os.path.isfile(f"{filename}.c4ga"):
-        os.remove(f"{filename}.c4ga")
-    else:
-        LOG.error(f"Error: %s file not found {filename}.c4ga")
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
