@@ -55,10 +55,9 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     cursor.execute('SELECT status FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
     status = cursor.fetchone()[0]
     LOG.debug(f"File status: {status}")
-    return status
-
     cursor.close()
     conn.close()
+    return status
 
 
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
@@ -153,8 +152,8 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, lates
         method_frame, props, body = channel.basic_get(queue=queue)
 
         if method_frame is None or props is None:
-            break
             LOG.error('No message returned')
+            break
 
         message_id = method_frame.delivery_tag
         if message_id in messages:  # we looped
@@ -375,11 +374,6 @@ def main():
     dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
     download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
-
-    if os.path.isfile(f"{filename}.c4ga"):
-        os.remove(f"{filename}.c4ga")
-    else:
-        LOG.error(f"Error: %s file not found {filename}.c4ga")
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
