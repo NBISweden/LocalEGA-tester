@@ -15,5 +15,4 @@ test_file=$(date +"%Y-%m-%d_%H-%M-%S")
 wget -O /volume/$test_file $FILE
 
 sleep 3
-
-python test.py /volume/$test_file /conf/config.yaml
+legatest /volume/$test_file /conf/config.yaml
