@@ -24,3 +24,8 @@ positional arguments:
 optional arguments:
   -h, --help  show this help message and exit
 ```
+
+
+### License
+
+`LocalEGA-tester` and all it sources are released under GNU General Public License v3.0.
