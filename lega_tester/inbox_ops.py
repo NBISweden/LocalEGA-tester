@@ -21,7 +21,8 @@ def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222
         client = paramiko.SSHClient()
         k = paramiko.RSAKey.from_private_key_file(key_path, password=key_pass)
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname, allow_agent=False, look_for_keys=False, port=port, timeout=0.3, username=user, pkey=k)
+        client.connect(hostname, allow_agent=False, look_for_keys=False,
+                       port=port, timeout=0.3, username=user, pkey=k)
         LOG.info(f'ssh connected to {hostname}:{port} with {user} | PASS |')
     except paramiko.BadHostKeyException as e:
         LOG.error(f'Something went wrong {e}')
@@ -49,7 +50,7 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         if os.path.isfile(file_path):
             sftp.put(file_path, f'{output_base}.c4ga')
         else:
-            raise IOError('Could not find localFile {file_path} !!' )
+            raise IOError('Could not find localFile {file_path} !!')
         LOG.info(f'file uploaded {output_base}.c4ga | PASS |')
     except Exception as e:
         LOG.error(f'Something went wrong {e}')

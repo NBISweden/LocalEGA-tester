@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='lega_test',
+    name='lega_tester',
     version='0.2.0',
     packages=find_packages(),
-    py_modules=['lega_test'],
+    py_modules=['lega_tester'],
     include_package_data=True,
     project_urls={
         'Source': 'https://github.com/NBISweden/LocalEGA-tester',
@@ -28,6 +28,7 @@ setup(
             'legatest=lega_tester.test:main'
         ]
     },
+    package_data={'': ['config.yaml']},
     platforms='any',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
