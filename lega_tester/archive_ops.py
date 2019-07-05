@@ -1,7 +1,6 @@
 import os
 import logging
 from minio import Minio
-from distutils import util
 from tenacity import retry, stop_after_delay, wait_fixed
 from .utils import strip_url_scheme
 
@@ -13,14 +12,12 @@ LOG = logging.getLogger(__name__)
 log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
-SSL_ENABLE = bool(util.strtobool(os.environ.get('TLS_ENABLE', 'false')))
-
 
 @retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
-def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, secret):
+def list_s3_objects(minio_address, bucket_name, region_name, file_id, access, secret, ssl_enable):
     """Check if there is a file inside s3."""
     minioClient = Minio(strip_url_scheme(minio_address), access_key=access, secret_key=secret,
-                        region=region_name, secure=SSL_ENABLE)
+                        region=region_name, secure=ssl_enable)
     LOG.debug(f'Connected to S3: {minio_address}.')
     # List all object paths in bucket that begin with my-prefixname.
     objects = minioClient.list_objects_v2(bucket_name, recursive=True)
