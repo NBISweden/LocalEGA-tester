@@ -4,6 +4,10 @@ import pika
 import json
 import sys
 import logging
+import ssl
+from pathlib import Path
+from functools import partial
+from distutils import util
 from tenacity import retry, stop_after_delay, wait_fixed
 
 
@@ -14,12 +18,42 @@ LOG = logging.getLogger(__name__)
 log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
+MQ_PROTOCOL = 'amqp' if bool(util.strtobool(os.environ.get('TLS_ENABLE', 'false'))) is False else 'amqps'
 
-def submit_cega(protocol, address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
+
+def check_mq_ssl(root_ca, mq_cert, key_file, parameters):
+    """Set parameters for MQ server secure connection."""
+    context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)  # Enforcing (highest) TLS version (so... 1.2?)
+
+    context.check_hostname = False
+
+    cacertfile = Path('CA.cert.pem')
+    certfile = Path('tester.cert.pem')
+    keyfile = Path('tester.sec.pem')
+
+    context.verify_mode = ssl.CERT_NONE
+    if cacertfile.exists():
+        context.verify_mode = ssl.CERT_REQUIRED
+        context.load_verify_locations(cafile=str(cacertfile))
+
+    if certfile.exists():
+        assert(keyfile.exists())
+        context.load_cert_chain(str(certfile), keyfile=str(keyfile))
+
+    parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
+
+
+amqps_set_params = partial(check_mq_ssl, 'root_ca', 'mq_cert', 'key_file')
+
+
+def submit_cega(address, user, vhost, message, routing_key, mq_password, correlation_id, port=5672, file_md5=None):
     """Submit message to CEGA along with."""
-    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{MQ_PROTOCOL}://{user}:{mq_password}@{address}:{port}/{vhost}'
+
     try:
         parameters = pika.URLParameters(mq_address)
+        if MQ_PROTOCOL == 'amqps':
+            amqps_set_params(parameters)
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.basic_publish(exchange='localega.v1', routing_key=routing_key,
@@ -35,11 +69,13 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
         raise e
 
 
-@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
-def get_corr(protocol, address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
+@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))  #noqa: C901
+def get_corr(address, user, vhost, queue, filepath, mq_password, latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
-    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
+    mq_address = f'{MQ_PROTOCOL}://{user}:{mq_password}@{address}:{port}/{vhost}'
     parameters = pika.URLParameters(mq_address)
+    if MQ_PROTOCOL == 'amqps':
+        amqps_set_params(parameters)
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
