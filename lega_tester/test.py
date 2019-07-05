@@ -24,6 +24,17 @@ log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
 
+def prepare_config(conf):
+    """Prepare configuration variables after parsing config file."""
+    with open(conf, 'r') as stream:
+        try:
+            config_file = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            LOG.error(exc)
+
+    return config_file['localega']
+
+
 def main():
     """Do the sparkles and fireworks."""
     parser = argparse.ArgumentParser(description="M4 end to end test with YAML configuration.")
@@ -36,28 +47,19 @@ def main():
     used_file = Path(args.input)
     filename = Path(used_file).stem
     output_base = Path(filename).name
-    with open(Path(args.config), 'r') as stream:
-        try:
-            config_file = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            LOG.error(exc)
 
     # Initialise what is needed
-
-    res_file = f'{filename}.res'
-    dataedge_file = f'{filename}.dataedge'
-    config = config_file['localega']
+    config = prepare_config(Path(args.config))
     key_pk = os.path.expanduser(config['user_key'])
     pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
+    token = config['token']
+    test_user = config['user']
     session_key = ''
     iv = ''
     fileID = ''
-    token = config['token']
-    cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
 
-    test_user = config['user']
-    # TEST Connection before anything
+    # Test Inbox Connection before anything
     open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
     # Get current id from database
     current_id = get_last_id(config['db_in_user'], config['db_name'],
@@ -74,10 +76,10 @@ def main():
     stableID = 'EGAF'+''.join(secrets.choice(string.digits) for i in range(16))
     if c4ga_md5:
         sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
-        correlation_id = get_corr(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
+        correlation_id = get_corr(config['cm_address'], config['cm_user'], config['cm_vhost'],
                                   'v1.files.inbox', f'{output_base}.c4ga',
                                   config['cm_pass'], port=config['cm_port'])
-        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'user': test_user, 'filepath': f'{output_base}.c4ga'}, 'files',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         # Once the file has been ingested it should be the last ID in the database
@@ -89,7 +91,7 @@ def main():
             fileID = get_last_id(config['db_in_user'], config['db_name'],
                                  config['db_in_pass'], config['db_address'])
         # wait for submission to go through
-        get_corr(cm_protocol, config['cm_address'], config['cm_user'],
+        get_corr(config['cm_address'], config['cm_user'],
                  config['cm_vhost'], 'v1.files.completed', f'{output_base}.c4ga', config['cm_pass'],
                  port=config['cm_port'])
         # Wait for file status
@@ -101,7 +103,7 @@ def main():
                                      fileID)
 
         # Stable ID should be sent by CentralEGA
-        submit_cega(cm_protocol, config['cm_address'], config['cm_user'], config['cm_vhost'],
+        submit_cega(config['cm_address'], config['cm_user'], config['cm_vhost'],
                     {'file_id': fileID, 'stable_id': stableID}, 'stableIDs',
                     config['cm_pass'], correlation_id, port=config['cm_port'])
         list_s3_objects(config['s3_address'], config['s3_bucket'],
@@ -110,6 +112,7 @@ def main():
     LOG.debug('Ingestion DONE')
     LOG.debug('-------------------------------------')
     # Verify that the file can be downloaded from RES using the session_key and IV
+    res_file = f'{filename}.res'
     res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
     res_url = f"http://{config['res_address']}:{config['res_port']}/file"
     download_to_file(res_url, res_payload, res_file)
@@ -127,6 +130,7 @@ def main():
 
     # Verify that the file can be downloaded from DataEdge
     # We are using a token that can be validated by DataEdge
+    dataedge_file = f'{filename}.dataedge'
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
     dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
