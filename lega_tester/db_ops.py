@@ -2,6 +2,7 @@
 import os
 import logging
 import psycopg2
+from distutils import util
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -11,11 +12,16 @@ LOG = logging.getLogger(__name__)
 log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
+# We might need to use `verify-ca`
+# We default to disabling TLS
+SSL_ENABLE = 'disable' if bool(util.strtobool(os.environ.get('TLS_ENABLE', 'false'))) is False else 'require'
+
 
 def get_last_id(db_user, db_name, db_pass, db_host):
     """Retrieve the last inserted file in the database, indifferent of status."""
     conn = psycopg2.connect(user=db_user, password=db_pass,
-                            database=db_name, host=db_host)
+                            database=db_name, host=db_host,
+                            sslmode=SSL_ENABLE)
     cursor = conn.cursor()
     cursor.execute('''SELECT created_at, id FROM local_ega.files ORDER BY created_at DESC LIMIT 1''')
     values = cursor.fetchone()
@@ -34,7 +40,8 @@ def get_last_id(db_user, db_name, db_pass, db_host):
 def get_file_status(db_user, db_name, db_pass, db_host, file_id):
     """Retrieve the last inserted file in the database, indifferent of status."""
     conn = psycopg2.connect(user=db_user, password=db_pass,
-                            database=db_name, host=db_host)
+                            database=db_name, host=db_host,
+                            sslmode=SSL_ENABLE)
     cursor = conn.cursor()
     cursor.execute('SELECT status FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
     status = cursor.fetchone()[0]
@@ -47,7 +54,8 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id):
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id):
     """Assign file to dataset for dataset driven permissions."""
     conn = psycopg2.connect(user=db_user, password=db_pass,
-                            database=db_name, host=db_host)
+                            database=db_name, host=db_host,
+                            sslmode=SSL_ENABLE)
     last_index = None
     with conn.cursor() as cursor:
         cursor.execute('''SELECT id FROM local_ega_ebi.filedataset ORDER BY id DESC LIMIT 1''')
