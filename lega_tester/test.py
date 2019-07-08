@@ -194,7 +194,7 @@ def dependency_map_file2dataset(config, fileID):
 def main():
     """Do the sparkles and fireworks."""
     parser = argparse.ArgumentParser(description="End to end test for LocalEGA,\
-                                                  based on YAML configuration.")
+                                                  with YAML configuration.")
 
     # Should we do this in a configuration file ?
     parser.add_argument('input', help='File to be uploaded.')

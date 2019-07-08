@@ -15,7 +15,7 @@ legatest -h
 ➜ legatest -h
 usage: legatest [-h] input config
 
-M4 end to end test with YAML configuration.
+End to end test for LocalEGA, with YAML configuration.
 
 positional arguments:
   input       File to be uploaded.
