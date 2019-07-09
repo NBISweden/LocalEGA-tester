@@ -47,7 +47,6 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
 
             parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
             LOG.debug('Added SSL_OPTIONS for MQ connection.')
-        # LOG.debug(f"pika connection using {parameters.__dict__}")
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.basic_publish(exchange='localega.v1', routing_key=routing_key,
@@ -91,7 +90,6 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
 
         parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
         LOG.debug('Added SSL_OPTIONS for MQ connection.')
-    # LOG.debug(f"pika connection using {parameters.__dict__}")
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 

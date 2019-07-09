@@ -70,7 +70,7 @@ def test_step_res_download(config, filename, fileID, used_file, session_key, iv)
     # Verify that the file can be downloaded from RES using the session_key and IV
     res_file = f'{filename}.res'
     res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
-    res_url = f"http://{config['res_address']}:{config['res_port']}/file"
+    res_url = f"https://{config['res_address']}:{config['res_port']}/file"
     download_to_file(res_url, res_payload, res_file)
     compare_files('RES', res_file, used_file)
 
@@ -83,7 +83,7 @@ def test_step_dataedge_download(config, filename, stableID, used_file):
     dataedge_file = f'{filename}.dataedge'
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
-    dataedge_url = f"http://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
+    dataedge_url = f"https://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
     download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
 
