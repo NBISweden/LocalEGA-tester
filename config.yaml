@@ -11,9 +11,9 @@ localega:
   # Private key password.
   encrypt_key_pass:
   # Inbox address, or service name and port
-  tls_cert_ending: .ca.crt
-  tls_key_ending: .ca.key
-  tls_ca_root_file: root.ca.crt
+  tls_cert_tester: /config/tester.ca.crt
+  tls_key_tester: /config/tester.ca.key
+  tls_ca_root_file: /config/root.ca.crt
   inbox_address: localega-inbox
   inbox_port: 2222
   # S3 address, or service name, should include port number
