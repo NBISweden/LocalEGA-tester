@@ -99,7 +99,7 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
         method_frame, props, body = channel.basic_get(queue=queue)
 
         if method_frame is None or props is None:
-            LOG.error('No message returned')
+            LOG.debug('No message returned')
             break
 
         message_id = method_frame.delivery_tag

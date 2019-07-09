@@ -26,9 +26,11 @@ def strip_url_scheme(url):
 def download_to_file(service, payload, output, headers=None):
     """Download file from service and write to file."""
     if headers:
-        download = requests.get(service, params=payload, headers=headers)
+        # download = requests.get(service, params=payload, headers=headers, cert=(test_cert, test_key_file))
+        download = requests.get(service, params=payload, headers=headers, verify=False)
     else:
-        download = requests.get(service, params=payload)
+        # download = requests.get(service, params=payload, cert=(test_cert, test_key_file))
+        download = requests.get(service, params=payload, verify=False)
     # We are using filecmp thus we will write content to file
     assert download.status_code == 200, f'We got a status that is not OK {download.status_code} | FAIL |'
     LOG.info(f"File downloaded from {service}. | PASS |")

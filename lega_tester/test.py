@@ -59,7 +59,8 @@ def test_step_check_archive(config, fileID):
     list_s3_objects(config['s3_address'], config['s3_bucket'],
                     config['s3_region'], fileID,
                     config['s3_access'], config['s3_secret'],
-                    config['s3_ssl'])
+                    config['s3_ssl'],
+                    config['tls_ca_root_file'])
 
 
 def test_step_res_download(config, filename, fileID, used_file, session_key, iv):
@@ -71,6 +72,9 @@ def test_step_res_download(config, filename, fileID, used_file, session_key, iv)
     res_file = f'{filename}.res'
     res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
     res_url = f"https://{config['res_address']}:{config['res_port']}/file"
+    # download_to_file(res_url, res_payload, res_file,
+    #                  config['tls_cert_tester'],
+    #                  config['tls_key_tester'])
     download_to_file(res_url, res_payload, res_file)
     compare_files('RES', res_file, used_file)
 
@@ -84,6 +88,9 @@ def test_step_dataedge_download(config, filename, stableID, used_file):
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
     dataedge_url = f"https://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
+    # download_to_file(dataedge_url, edge_payload, dataedge_file,
+    #                  config['tls_cert_tester'],
+    #                  config['tls_key_tester'], headers=edge_headers)
     download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
 
