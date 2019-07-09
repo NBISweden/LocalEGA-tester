@@ -122,12 +122,6 @@ def fixture_step_completed(config, current_id, output_base):
     # We use this ID everywhere including donwload from DataEdge
     # In future versions once we fix DB schema we will use StableID for download
     cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
-    fileID = 0
-    while (fileID <= current_id):
-        time.sleep(1)
-        fileID = get_last_id(config['db_in_user'], config['db_name'],
-                             config['db_in_pass'], config['db_address'],
-                             config['db_ssl'])
     # wait for submission to go through
     get_corr(cm_protocol, config['cm_address'], config['cm_user'],
              config['cm_vhost'], 'v1.files.completed', f'{output_base}.c4ga',
@@ -213,7 +207,6 @@ def main():
     # Initialise what is needed
     config = prepare_config(Path(args.config))
     test_user = config['user']
-    fileID = ''
 
     current_id = fixture_step_db_id(config)
     test_file, _, session_key, iv = fixture_step_encrypt(config, used_file)
@@ -223,6 +216,12 @@ def main():
 
     # Stable ID should be sent by CentralEGA
     stableID = 'EGAF'+''.join(secrets.choice(string.digits) for i in range(16))
+    fileID = 0
+    while (fileID <= current_id):
+        time.sleep(1)
+        fileID = get_last_id(config['db_in_user'], config['db_name'],
+                             config['db_in_pass'], config['db_address'],
+                             config['db_ssl'])
     dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
     test_step_check_archive(config, fileID)
     LOG.debug('Ingestion DONE')
