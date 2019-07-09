@@ -17,31 +17,10 @@ log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
 
-def check_mq_ssl(root_ca, test_cert, test_key_file, parameters):
-    """Set parameters for MQ server secure connection."""
-    context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)  # Enforcing (highest) TLS version (so... 1.2?)
-
-    context.check_hostname = False
-
-    cacertfile = Path(root_ca)
-    certfile = Path(test_cert)
-    keyfile = Path(test_key_file)
-
-    context.verify_mode = ssl.CERT_NONE
-    if cacertfile.exists():
-        context.verify_mode = ssl.CERT_REQUIRED
-        context.load_verify_locations(cafile=str(cacertfile))
-
-    if certfile.exists():
-        assert(keyfile.exists())
-        context.load_cert_chain(str(certfile), keyfile=str(keyfile))
-
-    parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
-    LOG.debug('Added SSL_OPTIONS for MQ connection.')
-
-
 def submit_cega(protocol, address, user, vhost, message, routing_key, mq_password,
-                amqps_set_params, correlation_id, port=5672, file_md5=None):
+                correlation_id,
+                root_ca, test_cert, test_key_file,
+                port=5672, file_md5=None):
     """Submit message to CEGA along with."""
     mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
 
@@ -49,8 +28,26 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
         LOG.debug(f'Connection address: {mq_address}')
         parameters = pika.URLParameters(mq_address)
         if protocol == 'amqps':
-            amqps_set_params(parameters)
-        LOG.DEBUG(f"pika connection using {parameters.__dict__}")
+            context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)  # Enforcing (highest) TLS version (so... 1.2?)
+
+            context.check_hostname = False
+
+            cacertfile = Path(root_ca)
+            certfile = Path(test_cert)
+            keyfile = Path(test_key_file)
+
+            context.verify_mode = ssl.CERT_NONE
+            if cacertfile.exists():
+                context.verify_mode = ssl.CERT_REQUIRED
+                context.load_verify_locations(cafile=str(cacertfile))
+
+            if certfile.exists():
+                assert(keyfile.exists())
+                context.load_cert_chain(str(certfile), keyfile=str(keyfile))
+
+            parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
+            LOG.debug('Added SSL_OPTIONS for MQ connection.')
+        LOG.debug(f"pika connection using {parameters.__dict__}")
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.basic_publish(exchange='localega.v1', routing_key=routing_key,
@@ -68,14 +65,33 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
 
 @retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))  #noqa: C901
 def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
-             amqps_set_params, latest_message=True, port=5672):
+             root_ca, test_cert, test_key_file,
+             latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
     mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
     LOG.debug(f'Connection address: {mq_address}')
     parameters = pika.URLParameters(mq_address)
     if protocol == 'amqps':
-        amqps_set_params(parameters)
-    LOG.DEBUG(f"pika connection using {parameters.__dict__}")
+        context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)  # Enforcing (highest) TLS version (so... 1.2?)
+
+        context.check_hostname = False
+
+        cacertfile = Path(root_ca)
+        certfile = Path(test_cert)
+        keyfile = Path(test_key_file)
+
+        context.verify_mode = ssl.CERT_NONE
+        if cacertfile.exists():
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile=str(cacertfile))
+
+        if certfile.exists():
+            assert(keyfile.exists())
+            context.load_cert_chain(str(certfile), keyfile=str(keyfile))
+
+        parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
+        LOG.debug('Added SSL_OPTIONS for MQ connection.')
+    LOG.debug(f"pika connection using {parameters.__dict__}")
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
