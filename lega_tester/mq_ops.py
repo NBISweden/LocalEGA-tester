@@ -37,6 +37,7 @@ def check_mq_ssl(root_ca, test_cert, test_key_file, parameters):
         context.load_cert_chain(str(certfile), keyfile=str(keyfile))
 
     parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
+    LOG.debug('Added SSL_OPTIONS for MQ connection.')
 
 
 def submit_cega(protocol, address, user, vhost, message, routing_key, mq_password,
@@ -45,9 +46,11 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
     mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
 
     try:
+        LOG.debug(f'Connection address: {mq_address}')
         parameters = pika.URLParameters(mq_address)
         if protocol == 'amqps':
             amqps_set_params(parameters)
+        LOG.DEBUG(f"pika connection using {parameters.__dict__}")
         connection = pika.BlockingConnection(parameters)
         channel = connection.channel()
         channel.basic_publish(exchange='localega.v1', routing_key=routing_key,
@@ -68,9 +71,11 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
              amqps_set_params, latest_message=True, port=5672):
     """Read all messages from a queue and fetches the correlation_id for the one with given path, if found."""
     mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
+    LOG.debug(f'Connection address: {mq_address}')
     parameters = pika.URLParameters(mq_address)
     if protocol == 'amqps':
         amqps_set_params(parameters)
+    LOG.DEBUG(f"pika connection using {parameters.__dict__}")
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
