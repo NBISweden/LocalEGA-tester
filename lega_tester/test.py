@@ -11,7 +11,7 @@ import time
 from .utils import download_to_file, compare_files
 from .archive_ops import list_s3_objects
 from .db_ops import get_last_id, get_file_status, file2dataset_map
-from .mq_ops import submit_cega, get_corr
+from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
 from pathlib import Path
 
@@ -139,6 +139,22 @@ def fixture_step_completed(config, current_id, output_base):
              port=config['cm_port'])
 
 
+def fixture_step_purge(config):
+    """Test if file has completed both in MQ and in DB."""
+    # Once the file has been ingested it should be the last ID in the database
+    # We use this ID everywhere including donwload from DataEdge
+    # In future versions once we fix DB schema we will use StableID for download
+    cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
+    # wait for submission to go through
+    purge_cega_mq(cm_protocol, config['cm_address'], config['cm_user'],
+                  config['cm_vhost'],
+                  config['cm_pass'],
+                  config['tls_ca_root_file'],
+                  config['tls_cert_tester'],
+                  config['tls_key_tester'],
+                  port=config['cm_port'])
+
+
 # FAKING CEGA DEPENDENCIES
 
 
@@ -215,23 +231,26 @@ def main():
     config = prepare_config(Path(args.config))
     test_user = config['user']
 
-    current_id = fixture_step_db_id(config)
+    db_id = fixture_step_db_id(config)
+    current_id = 1 if db_id == 0 else db_id
     test_file, _, session_key, iv = fixture_step_encrypt(config, used_file)
     test_step_upload(config, test_user, test_file)
     correlation_id = dependency_make_cega_submission(config, test_user, output_base)
-    fixture_step_completed(config, current_id, output_base)
 
     # Stable ID should be sent by CentralEGA
     stableID = 'EGAF'+''.join(secrets.choice(string.digits) for i in range(16))
     fileID = 0
-    while (fileID <= current_id):
+    while (fileID <= db_id):
         time.sleep(1)
         fileID = get_last_id(config['db_in_user'], config['db_name'],
                              config['db_in_pass'], config['db_address'],
                              config['db_ssl'])
     dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
     test_step_check_archive(config, fileID)
+    # Additional step and not really needed
+    fixture_step_completed(config, current_id, output_base)
     LOG.debug('Ingestion DONE')
+    fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     test_step_res_download(config, filename, fileID, used_file, session_key, iv)
 

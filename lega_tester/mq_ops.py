@@ -99,7 +99,7 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
         method_frame, props, body = channel.basic_get(queue=queue)
 
         if method_frame is None or props is None:
-            LOG.debug('No message returned')
+            LOG.debug(f'No message returned in {queue}')
             break
 
         message_id = method_frame.delivery_tag
@@ -115,7 +115,7 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
             if user == user and filepath == filepath:
                 correlation_ids.append((props.correlation_id, message_id))
         except Exception as e:
-            LOG.error(f'Something went wrong {e}')
+            LOG.error(f'Something went wrong {e} in {queue}')
             pass
 
     # Second loop, nack the messages
@@ -125,7 +125,8 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
     connection.close()
 
     if not correlation_ids:
-        sys.exit(2)
+        LOG.error(f'No correlation ids found for {queue}.')
+        sys.exit(102)
 
     correlation_id = correlation_ids[0][0]
     if latest_message:
@@ -133,5 +134,44 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
         for cid, mid in correlation_ids:
             if mid > message_id:
                 correlation_id = cid
-    LOG.debug(f'correlation_id: {correlation_id}')
+    LOG.debug(f'correlation_id: {correlation_id} in {queue}')
     return correlation_id
+
+
+def purge_cega_mq(protocol, address, user, vhost, mq_password,
+                  root_ca, test_cert, test_key_file,
+                  port=5672):
+    """."""
+    queues = ['v1.files', 'v1.files.completed', 'v1.files.error', 'v1.files.inbox', 'v1.files.processing', 'v1.stableIDs']
+    mq_address = f'{protocol}://{user}:{mq_password}@{address}:{port}/{vhost}'
+    LOG.debug(f'Connection address: {mq_address}')
+    parameters = pika.URLParameters(mq_address)
+    if protocol == 'amqps':
+        context = ssl.SSLContext(protocol=ssl.PROTOCOL_TLS)  # Enforcing (highest) TLS version (so... 1.2?)
+
+        context.check_hostname = False
+
+        cacertfile = Path(root_ca)
+        certfile = Path(test_cert)
+        keyfile = Path(test_key_file)
+
+        context.verify_mode = ssl.CERT_NONE
+        if cacertfile.exists():
+            context.verify_mode = ssl.CERT_REQUIRED
+            context.load_verify_locations(cafile=str(cacertfile))
+
+        if certfile.exists():
+            assert(keyfile.exists())
+            context.load_cert_chain(str(certfile), keyfile=str(keyfile))
+
+        parameters.ssl_options = pika.SSLOptions(context=context, server_hostname=None)
+        LOG.debug('Added SSL_OPTIONS for MQ connection.')
+
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+
+    for queue in queues:
+        channel.queue_purge(queue=queue)
+        LOG.debug(f'Purged queue: {queue}')
+
+    connection.close()
