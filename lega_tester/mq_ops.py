@@ -114,8 +114,8 @@ def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
             assert(user and filepath)
             if user == user and filepath == filepath:
                 correlation_ids.append((props.correlation_id, message_id))
-        except Exception as e:
-            LOG.error(f'Something went wrong {e} in {queue}')
+        except Exception as error:
+            LOG.error(f'Something went wrong {error} in {queue}')
             pass
 
     # Second loop, nack the messages
@@ -171,7 +171,11 @@ def purge_cega_mq(protocol, address, user, vhost, mq_password,
     channel = connection.channel()
 
     for queue in queues:
-        channel.queue_purge(queue=queue)
-        LOG.debug(f'Purged queue: {queue}')
+        try:
+            channel.queue_purge(queue=queue)
+            LOG.debug(f'Purged queue: {queue}')
+        except Exception as error:
+            LOG.error(f'Something went wrong {error}')
+            pass
 
     connection.close()
