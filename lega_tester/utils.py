@@ -32,6 +32,7 @@ def download_to_file(service, payload, output, headers=None):
         # download = requests.get(service, params=payload, cert=(test_cert, test_key_file))
         download = requests.get(service, params=payload, verify=False)
     # We are using filecmp thus we will write content to file
+    LOG.debug(f'Download url is: {download.url}')
     assert download.status_code == 200, f'We got a status that is not OK {download.status_code} | FAIL |'
     LOG.info(f"File downloaded from {service}. | PASS |")
     LOG.debug(f'write content to {output}')
