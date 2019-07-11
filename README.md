@@ -3,3 +3,29 @@
 [![](https://images.microbadger.com/badges/image/nbisweden/localega-tester.svg)](https://microbadger.com/images/nbisweden/localega-tester "Get your own image badge on microbadger.com")
 
 ## End-to-end tester for LocalEGA
+
+**NOTE: Requires Python >3.6.**
+```
+git clone https://github.com/NBISweden/LocalEGA-tester.git
+pip install .
+legatest -h
+```
+
+```
+➜ legatest -h
+usage: legatest [-h] input config
+
+End to end test for LocalEGA, with YAML configuration.
+
+positional arguments:
+  input       File to be uploaded.
+  config      Configuration file.
+
+optional arguments:
+  -h, --help  show this help message and exit
+```
+
+
+### License
+
+`LocalEGA-tester` and all it sources are released under GNU General Public License v3.0.
