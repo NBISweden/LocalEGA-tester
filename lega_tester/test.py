@@ -245,11 +245,13 @@ def main():
         fileID = get_last_id(config['db_in_user'], config['db_name'],
                              config['db_in_pass'], config['db_address'],
                              config['db_ssl'])
-    dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
+
     test_step_check_archive(config, fileID)
     # Additional step and not really needed
     fixture_step_completed(config, current_id, output_base)
+    dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
     LOG.debug('Ingestion DONE')
+    time.sleep(10)
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     test_step_res_download(config, filename, fileID, used_file, session_key, iv)
