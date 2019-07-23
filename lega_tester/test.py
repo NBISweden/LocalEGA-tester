@@ -75,7 +75,7 @@ def test_step_res_download(config, filename, fileID, used_file, session_key, iv)
     # download_to_file(res_url, res_payload, res_file,
     #                  config['tls_cert_tester'],
     #                  config['tls_key_tester'])
-    download_to_file(res_url, res_payload, res_file)
+    download_to_file(config['tls_ca_root_file'], res_url, res_payload, res_file)
     compare_files('RES', res_file, used_file)
 
 
@@ -91,7 +91,7 @@ def test_step_dataedge_download(config, filename, stableID, used_file):
     # download_to_file(dataedge_url, edge_payload, dataedge_file,
     #                  config['tls_cert_tester'],
     #                  config['tls_key_tester'], headers=edge_headers)
-    download_to_file(dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
+    download_to_file(config['tls_ca_root_file'], dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
     compare_files('DataEdge', dataedge_file, used_file)
 
 
