@@ -18,6 +18,9 @@ LABEL org.label-schema.schema-version="1.0"
 
 RUN apk add --no-cache --update libressl postgresql-libs openssh-client curl
 
+RUN addgroup -g 1000 lega && \
+    adduser -D -u 1000 -G lega lega
+
 COPY --from=BUILD /usr/local/lib/python3.6/ usr/local/lib/python3.6/
 
 COPY --from=BUILD /usr/local/bin/legatest /usr/local/bin/
