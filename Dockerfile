@@ -21,6 +21,11 @@ RUN apk add --no-cache --update libressl postgresql-libs openssh-client curl
 RUN addgroup -g 1000 lega && \
     adduser -D -u 1000 -G lega lega
 
+RUN mkdir /volume && \
+    chmod 777 /volume
+
+VOLUME /volume
+
 COPY --from=BUILD /usr/local/lib/python3.6/ usr/local/lib/python3.6/
 
 COPY --from=BUILD /usr/local/bin/legatest /usr/local/bin/
