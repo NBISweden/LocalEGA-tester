@@ -16,7 +16,15 @@ FROM python:3.6-alpine3.8
 LABEL maintainer "NeIC System Developers"
 LABEL org.label-schema.schema-version="1.0"
 
-RUN apk add --no-cache --update libressl postgresql-libs
+RUN apk add --no-cache --update libressl postgresql-libs openssh-client curl
+
+RUN addgroup -g 1000 lega && \
+    adduser -D -u 1000 -G lega lega
+
+RUN mkdir /volume && \
+    chmod 777 /volume
+
+VOLUME /volume
 
 COPY --from=BUILD /usr/local/lib/python3.6/ usr/local/lib/python3.6/
 

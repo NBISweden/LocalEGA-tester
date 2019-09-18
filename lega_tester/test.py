@@ -69,7 +69,7 @@ def test_step_res_download(config, filename, fileID, used_file, session_key, iv)
     Not necessary but good to have and see before testing dataedge
     """
     # Verify that the file can be downloaded from RES using the session_key and IV
-    res_file = f'{filename}.res'
+    res_file = f'/volume/{filename}.res'
     res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
     res_url = f"https://{config['res_address']}:{config['res_port']}/file"
     # download_to_file(res_url, res_payload, res_file,
@@ -84,7 +84,7 @@ def test_step_dataedge_download(config, filename, stableID, used_file):
     # Verify that the file can be downloaded from DataEdge
     # We are using a token that can be validated by DataEdge
     token = config['token']
-    dataedge_file = f'{filename}.dataedge'
+    dataedge_file = f'/volume/{filename}.dataedge'
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
     dataedge_url = f"https://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
