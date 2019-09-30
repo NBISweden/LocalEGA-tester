@@ -47,7 +47,7 @@ def test_step_upload(config, test_user, test_file):
 
 
 def test_step_check_archive(config, fileID):
-    """Check the S3 archive if the file was archived."""
+    """Check the archive if the file was archived."""
     # Wait for file status
     status = ''
     while (status != 'COMPLETED'):
@@ -56,11 +56,16 @@ def test_step_check_archive(config, fileID):
                                  config['db_in_pass'], config['db_address'],
                                  fileID,
                                  config['db_ssl'])
-    list_s3_objects(config['s3_address'], config['s3_bucket'],
-                    config['s3_region'], fileID,
-                    config['s3_access'], config['s3_secret'],
-                    config['s3_ssl'],
-                    config['tls_ca_root_file'])
+    if config['data_storage_type'] == "S3Storage":
+        list_s3_objects(config['s3_address'], config['s3_bucket'],
+                        config['s3_region'], fileID,
+                        config['s3_access'], config['s3_secret'],
+                        config['s3_ssl'],
+                        config['tls_ca_root_file'])
+    elif config['data_storage_type'] == "FileStorage":
+        assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
+        file_path = Path(f'/ega/archive/{fileID}')
+        LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
 def test_step_res_download(config, filename, fileID, used_file, session_key, iv):
