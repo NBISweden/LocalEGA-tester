@@ -9,7 +9,7 @@ env:
   global:
   - VERSION=$TRAVIS_TAG
   - VCS_SOURCE="https://github.com/${TRAVIS_REPO_SLUG}"
-  - export DOCKER_REPO=nbisweden
+  - export DOCKER_REPO=nbisweden/localega-tester
 before_script:
 - docker pull "$DOCKER_REPO" || true
 
