@@ -13,7 +13,7 @@ setup(
     author='LocalEGA Developers',
     install_requires=[
         'cryptography',
-        'PGPy==0.4.3',
+        'PGPy',
         'pika',
         'paramiko',
         'minio',
