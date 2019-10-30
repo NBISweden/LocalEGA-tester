@@ -50,6 +50,19 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id, ssl_enable):
     return status
 
 
+@retry(retry_on_result="false", wait_exponential_multiplier=1000, wait_exponential_max=20000, stop=(stop_after_delay(300000)))  #noqa: C901
+def ensure_db_status(config, fileID, expected_status):
+    """Verify DB status is correct before continuing."""
+    status = get_file_status(config['db_in_user'], config['db_name'],
+                             config['db_in_pass'], config['db_address'],
+                             fileID,
+                             config['db_ssl'])
+    if(status == expected_status):
+        return status
+    else:
+        return None
+
+
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id, ssl_enable):
     """Assign file to dataset for dataset driven permissions."""
     conn = psycopg2.connect(user=db_user, password=db_pass,
