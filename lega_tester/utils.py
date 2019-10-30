@@ -24,17 +24,19 @@ def strip_url_scheme(url):
 
 
 def download_to_file(root_ca, service, payload, output, headers=None):
-    """Download file from service and write to file."""
-    if headers:
-        download = requests.get(service, params=payload, headers=headers, verify=(root_ca))
-    else:
-        download = requests.get(service, params=payload, verify=(root_ca))
-    # We are using filecmp thus we will write content to file
-    LOG.debug(f'Download url is: {download.url}')
-    assert download.status_code == 200, f'We got a status that is not OK {download.status_code} | FAIL |'
+    """Download file in chunks."""
+    with requests.get(service, params=payload, headers=headers,
+                      verify=(root_ca), stream=True) as r:
+        LOG.debug(f'Download url is: {r.url}')
+        assert r.status_code == 200, f'We got a status that is not OK {r.status_code} | FAIL |'
+        with open(output, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+
     LOG.info(f"File downloaded from {service}. | PASS |")
     LOG.debug(f'write content to {output}')
-    open(output, 'wb').write(download.content)
+    return output
 
 
 def compare_files(service, downloaded_file, used_file):
