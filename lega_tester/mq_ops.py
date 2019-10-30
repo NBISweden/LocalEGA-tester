@@ -62,7 +62,7 @@ def submit_cega(protocol, address, user, vhost, message, routing_key, mq_passwor
         raise e
 
 
-@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))  #noqa: C901
+@retry(wait=wait_fixed(2000), stop=(stop_after_delay(300000)))  #noqa: C901
 def get_corr(protocol, address, user, vhost, queue, filepath, mq_password,
              root_ca, test_cert, test_key_file,
              latest_message=True, port=5672):

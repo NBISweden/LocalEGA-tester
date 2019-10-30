@@ -7,7 +7,6 @@ from legacryptor.crypt4gh import Header, get_header
 import pgpy
 import argparse
 import yaml
-import time
 from .utils import download_to_file, compare_files
 from .archive_ops import list_s3_objects, check_file_exists
 from .db_ops import get_last_id, ensure_db_status, file2dataset_map
@@ -116,6 +115,17 @@ def fixture_step_db_id(config):
     return current_id
 
 
+@retry(retry_on_result="false", wait_exponential_multiplier=1000, wait_exponential_max=20000, stop=(stop_after_delay(300000)))  #noqa: C901
+def fixture_step_file_id(config, db_id):
+    """Get FileID to the file just uploaded."""
+    fileID = 0
+    while (fileID <= db_id):
+        fileID = get_last_id(config['db_in_user'], config['db_name'],
+                             config['db_in_pass'], config['db_address'],
+                             config['db_ssl'])
+    return fileID
+
+
 def fixture_step_encrypt(config, used_file):
     """Encrypt file and retrieve necessary info for test."""
     pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
@@ -148,12 +158,8 @@ def fixture_step_completed(config, current_id, output_base):
 
 
 def fixture_step_purge(config):
-    """Test if file has completed both in MQ and in DB."""
-    # Once the file has been ingested it should be the last ID in the database
-    # We use this ID everywhere including donwload from DataEdge
-    # In future versions once we fix DB schema we will use StableID for download
+    """Purge MQ queues, to clean after test."""
     cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
-    # wait for submission to go through
     purge_cega_mq(cm_protocol, config['cm_address'], config['cm_user'],
                   config['cm_vhost'],
                   config['cm_pass'],
@@ -264,7 +270,7 @@ def main():
     # needed for downloading
     ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
-    time.sleep(10)
+
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     test_step_res_download(config, filename, fileID, used_file, session_key, iv)
