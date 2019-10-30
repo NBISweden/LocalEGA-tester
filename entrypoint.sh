@@ -11,8 +11,13 @@ else
     exit 1
 fi
 
+if [ -d "/etc/ssl/certs/ca-certificates.crt" ]; then
+  cat /conf/root.ca.crt /etc/ssl/certs/ca-certificates.crt > /volume/ca-certificates
+
+fi
+
 test_file=$(date +"%Y-%m-%d_%H-%M-%S")
-wget -O /volume/$test_file $FILE
+wget -O /volume/"$test_file" "$FILE"
 
 sleep 3
-legatest /volume/$test_file /conf/config.yaml
+legatest /volume/"$test_file" /conf/config.yaml
