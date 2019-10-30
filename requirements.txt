@@ -2,7 +2,7 @@ cryptography
 PGPy
 pika
 paramiko
-minio
+boto3
 PyYAML
 requests
 git+https://github.com/neicnordic/LocalEGA-cryptor.git

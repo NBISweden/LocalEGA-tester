@@ -9,8 +9,8 @@ import argparse
 import yaml
 import time
 from .utils import download_to_file, compare_files
-from .archive_ops import list_s3_objects
-from .db_ops import get_last_id, get_file_status, file2dataset_map
+from .archive_ops import list_s3_objects, check_file_exists
+from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
 from pathlib import Path
@@ -48,21 +48,24 @@ def test_step_upload(config, test_user, test_file):
 
 def test_step_check_archive(config, fileID):
     """Check the archive if the file was archived."""
-    # Wait for file status
-    status = ''
-    while (status != 'COMPLETED'):
-        time.sleep(1)
-        status = get_file_status(config['db_in_user'], config['db_name'],
-                                 config['db_in_pass'], config['db_address'],
-                                 fileID,
-                                 config['db_ssl'])
-    if config['data_storage_type'] == "S3Storage":
+    # default to S3 Archive as this is default setup.
+    if 'data_storage_type' in config and config['data_storage_type']:
+        storage_type = config['data_storage_type']
+    else:
+        storage_type = "S3Storage"
+    if storage_type == "S3Storage":
+        check_file_exists(config['s3_address'], config['s3_bucket'],
+                          config['s3_region'], fileID,
+                          config['s3_access'], config['s3_secret'],
+                          config['s3_ssl'],
+                          config['tls_ca_root_file'])
+        # While we are at it let us see what is inside the S3 Archive
         list_s3_objects(config['s3_address'], config['s3_bucket'],
                         config['s3_region'], fileID,
                         config['s3_access'], config['s3_secret'],
                         config['s3_ssl'],
                         config['tls_ca_root_file'])
-    elif config['data_storage_type'] == "FileStorage":
+    elif storage_type == "FileStorage":
         assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
         file_path = Path(f'/ega/archive/{fileID}')
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
@@ -244,17 +247,22 @@ def main():
 
     # Stable ID should be sent by CentralEGA
     stableID = 'EGAF'+''.join(secrets.choice(string.digits) for i in range(16))
-    fileID = 0
-    while (fileID <= db_id):
-        time.sleep(1)
-        fileID = get_last_id(config['db_in_user'], config['db_name'],
-                             config['db_in_pass'], config['db_address'],
-                             config['db_ssl'])
+    fileID = fixture_step_file_id(config, db_id)
 
+    # Wait for file status
+    # check that verify did its job and put the file in COMPLETED
+    ensure_db_status(config, fileID, "COMPLETED")
+
+    # check file is in archive
     test_step_check_archive(config, fileID)
+
     # Additional step and not really needed
     fixture_step_completed(config, current_id, output_base)
     dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
+
+    # check that finalize did its job and put the file in READY
+    # needed for downloading
+    ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
     time.sleep(10)
     fixture_step_purge(config)
