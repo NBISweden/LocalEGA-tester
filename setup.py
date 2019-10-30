@@ -2,12 +2,12 @@ from setuptools import setup, find_packages
 
 setup(
     name='lega_tester',
-    version='0.3.1',
+    version='0.3.2',
     packages=find_packages(),
     py_modules=['lega_tester'],
     include_package_data=True,
     project_urls={
-        'Source': 'https://github.com/NBISweden/LocalEGA-tester',
+        'Source': 'https://github.com/neicnordic/LocalEGA-tester',
     },
     description='LocalEGA end to end tester script.',
     author='LocalEGA Developers',
@@ -16,7 +16,7 @@ setup(
         'PGPy',
         'pika',
         'paramiko',
-        'minio',
+        'boto3',
         'PyYAML',
         'requests',
         'psycopg2-binary',
