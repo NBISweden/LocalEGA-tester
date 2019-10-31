@@ -2,6 +2,7 @@
 import os
 import logging
 import psycopg2
+from tenacity import retry, stop_after_delay, wait_exponential
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
