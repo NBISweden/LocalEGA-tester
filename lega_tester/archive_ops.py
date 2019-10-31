@@ -20,7 +20,7 @@ def check_file_exists(address, bucket_name, region_name, file_id, access, secret
                         aws_secret_access_key=secret,
                         config=boto3.session.Config(signature_version='s3v4'),
                         region_name=region_name,
-                        verify=root_ca, )
+                        verify=root_ca)
     LOG.debug(f'Connected to S3: {address}.')
     try:
         s3.Object(bucket_name, str(file_id)).load()
@@ -41,7 +41,7 @@ def list_s3_objects(address, bucket_name, region_name, file_id, access, secret, 
                         aws_secret_access_key=secret,
                         config=boto3.session.Config(signature_version='s3v4'),
                         region_name=region_name,
-                        verify=root_ca, )
+                        verify=root_ca)
     LOG.debug(f'Connected to S3: {address}.')
     my_bucket = s3.Bucket(bucket_name)
     for obj in my_bucket.objects.all():
