@@ -116,14 +116,15 @@ def fixture_step_db_id(config):
     return current_id
 
 
-@retry(retry_on_result="false", wait_exponential_multiplier=1000, wait_exponential_max=20000, stop=(stop_after_delay(300000)))  #noqa: C901
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)))  #noqa: C901
 def fixture_step_file_id(config, db_id):
     """Get FileID to the file just uploaded."""
-    fileID = 0
+    fileID = get_last_id(config['db_in_user'], config['db_name'],
+                            config['db_in_pass'], config['db_address'],
+                            config['db_ssl'])
     while (fileID <= db_id):
-        fileID = get_last_id(config['db_in_user'], config['db_name'],
-                             config['db_in_pass'], config['db_address'],
-                             config['db_ssl'])
+        raise TryAgain
+
     return fileID
 
 
