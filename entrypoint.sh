@@ -13,7 +13,7 @@ else
     exit 1
 fi
 
-if [ -d "/etc/ssl/certs/ca-certificates.crt" ]; then
+if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
   cat /conf/root.ca.crt /etc/ssl/certs/ca-certificates.crt > /volume/ca-certificates
 
 fi
