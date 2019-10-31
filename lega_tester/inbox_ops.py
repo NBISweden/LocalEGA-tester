@@ -14,7 +14,7 @@ log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
 
-@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
+@retry(wait=wait_fixed(2), stop=(stop_after_delay(300)))
 def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222):
     """Open an ssh connection, test function."""
     try:

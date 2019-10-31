@@ -12,7 +12,7 @@ log_level = os.environ.get('DEFAULT_LOG', 'INFO').upper()
 LOG.setLevel(log_level)
 
 
-@retry(wait=wait_fixed(20000), stop=(stop_after_delay(360000)))
+@retry(wait=wait_fixed(2), stop=(stop_after_delay(300)))
 def check_file_exists(address, bucket_name, region_name, file_id, access, secret, ssl_enable, root_ca):
     """Check if there is a file inside s3."""
     s3 = boto3.resource('s3', endpoint_url=address,
