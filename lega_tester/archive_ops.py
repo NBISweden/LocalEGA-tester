@@ -23,7 +23,7 @@ def check_file_exists(address, bucket_name, region_name, file_id, access, secret
                         verify=root_ca, )
     LOG.debug(f'Connected to S3: {address}.')
     try:
-        s3.Object(bucket_name, file_id).load()
+        s3.Object(bucket_name, str(file_id)).load()
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == "404":
             raise Exception("Could not find the file just uploaded! | FAIL | ")
