@@ -143,7 +143,7 @@ def fixture_step_encrypt(config, used_file):
         session_key = header.records[0].session_key.hex()
         iv = header.records[0].iv.hex()
 
-    with open(VALUES_FILE, 'w') as enc_file:
+    with open(VALUES_FILE, 'w+') as enc_file:
         enc_file.write(f'{test_file},{c4ga_md5},{session_key},{iv}')
 
 

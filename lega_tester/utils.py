@@ -30,10 +30,13 @@ def is_none_p(value):
 
 def read_enc_file_values(values_file):
     """Read values for encrypted file from a file."""
+    line = ''
     with open(values_file, 'r') as f:
         line = f.readline()
-
-    return tuple(line.split(","))
+    if line != '':
+        return tuple(line.split(","))
+    else:
+        raise Exception('Error reading encrypted file values.')
 
 
 def download_to_file(root_ca, service, payload, output, headers=None):
