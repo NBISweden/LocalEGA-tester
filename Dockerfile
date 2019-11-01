@@ -30,6 +30,8 @@ COPY --from=BUILD /usr/local/lib/python3.6/ usr/local/lib/python3.6/
 
 COPY --from=BUILD /usr/local/bin/legatest /usr/local/bin/
 
+COPY --from=BUILD /usr/local/bin/legaenc /usr/local/bin/
+
 ADD entrypoint.sh .
 
 VOLUME /conf

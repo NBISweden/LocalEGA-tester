@@ -7,7 +7,7 @@ from legacryptor.crypt4gh import Header, get_header
 import pgpy
 import argparse
 import yaml
-from .utils import download_to_file, compare_files
+from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
 from .archive_ops import list_s3_objects, check_file_exists
 from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
@@ -15,6 +15,8 @@ from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
 from pathlib import Path
 from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
+
+VALUES_FILE = 'enc_file_values.txt'
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
 logging.basicConfig(format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
@@ -141,7 +143,8 @@ def fixture_step_encrypt(config, used_file):
         session_key = header.records[0].session_key.hex()
         iv = header.records[0].iv.hex()
 
-    return test_file, c4ga_md5, session_key, iv
+    with open(VALUES_FILE, 'w') as enc_file:
+        enc_file.write(f'{test_file},{c4ga_md5},{session_key},{iv}')
 
 
 def fixture_step_completed(config, current_id, output_base):
@@ -230,8 +233,8 @@ def dependency_map_file2dataset(config, fileID):
                      config['db_ssl'])
 
 
-def main():
-    """Do the sparkles and fireworks."""
+def enc_file():
+    """Encrypt file and store information about it."""
     parser = argparse.ArgumentParser(description="End to end test for LocalEGA,\
                                                   with YAML configuration.")
 
@@ -241,6 +244,21 @@ def main():
 
     args = parser.parse_args()
     used_file = Path(args.input)
+    config = prepare_config(Path(args.config))
+    fixture_step_encrypt(config, used_file)
+    LOG.debug('-------------------------------------')
+    LOG.info('file encrypted!')
+
+
+def main():
+    """Do the sparkles and fireworks."""
+    parser = argparse.ArgumentParser(description="End to end test for LocalEGA,\
+                                                  with YAML configuration.")
+    parser.add_argument('config', help='Configuration file.')
+
+    args = parser.parse_args()
+
+    used_file = Path(VALUES_FILE)
     filename = Path(used_file).stem
     output_base = Path(filename).name
 
@@ -250,7 +268,7 @@ def main():
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    test_file, _, session_key, iv = fixture_step_encrypt(config, used_file)
+    test_file, _, session_key, iv = read_enc_file_values(used_file)
     test_step_upload(config, test_user, test_file)
     correlation_id = dependency_make_cega_submission(config, test_user, output_base)
 

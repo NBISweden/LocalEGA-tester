@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='lega_tester',
-    version='0.3.2',
+    version='0.4.0',
     packages=find_packages(),
     py_modules=['lega_tester'],
     include_package_data=True,
@@ -25,7 +25,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'legatest=lega_tester.test:main'
+            'legatest=lega_tester.test:main',
+            'legaenc=lega_tester.test:enc_file'
         ]
     },
     package_data={'': ['config.yaml']},

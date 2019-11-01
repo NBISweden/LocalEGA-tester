@@ -19,4 +19,5 @@ if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
 fi
 
 sleep 3
-legatest /volume/"$test_file" /conf/config.yaml
+legaenc /volume/"$test_file" /conf/config.yaml
+legatest /conf/config.yaml
