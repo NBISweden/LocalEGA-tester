@@ -131,12 +131,12 @@ def fixture_step_file_id(config, db_id):
     return fileID
 
 
-def fixture_step_encrypt(config, used_file):
+def fixture_step_encrypt(config, original_file):
     """Encrypt file and retrieve necessary info for test."""
     pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
     # Encrypt File
-    test_file = encrypt_file(used_file, pub_key)
+    test_file = encrypt_file(original_file, pub_key)
     # Retrieve session_key and IV to test RES
     with sec_key.unlock(config['encrypt_key_pass']) as privkey:
         header = Header.decrypt(get_header(open(test_file, 'rb'))[1], privkey)
@@ -144,7 +144,7 @@ def fixture_step_encrypt(config, used_file):
         iv = header.records[0].iv.hex()
 
     with open(VALUES_FILE, 'w+') as enc_file:
-        enc_file.write(f'{test_file},{session_key},{iv}')
+        enc_file.write(f'{original_file},{test_file},{session_key},{iv}')
 
 
 def fixture_step_completed(config, current_id, output_base):
@@ -243,9 +243,9 @@ def enc_file():
     parser.add_argument('config', help='Configuration file.')
 
     args = parser.parse_args()
-    used_file = Path(args.input)
+    original_file = Path(args.input)
     config = prepare_config(Path(args.config))
-    fixture_step_encrypt(config, used_file)
+    fixture_step_encrypt(config, original_file)
     LOG.debug('-------------------------------------')
     LOG.info('file encrypted!')
 
@@ -265,7 +265,7 @@ def main():
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    test_file, session_key, iv = read_enc_file_values(enc_data)
+    original_file, test_file, session_key, iv = read_enc_file_values(enc_data)
 
     enc_file = Path(test_file)
     filename = Path(enc_file).stem
@@ -296,10 +296,10 @@ def main():
 
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
-    test_step_res_download(config, filename, fileID, enc_file, session_key, iv)
+    test_step_res_download(config, filename, fileID, original_file, session_key, iv)
 
     dependency_map_file2dataset(config, fileID)
-    test_step_dataedge_download(config, filename, stableID, enc_file)
+    test_step_dataedge_download(config, filename, stableID, original_file)
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
