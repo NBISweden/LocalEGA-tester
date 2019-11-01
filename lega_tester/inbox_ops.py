@@ -3,7 +3,6 @@ import os
 import logging
 from tenacity import retry, stop_after_delay, wait_fixed
 from legacryptor.crypt4gh import encrypt
-from hashlib import md5
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -64,15 +63,12 @@ def encrypt_file(file_path, pubkey):
     """Encrypt file and extract its md5."""
     file_size = os.path.getsize(file_path)
     filename, _ = os.path.splitext(file_path)
-    c4ga_md5 = None
     output_file = os.path.expanduser(f'{filename}.c4ga')
     infile = open(file_path, 'rb')
     try:
         encrypt(pubkey, infile, file_size, open(f'{filename}.c4ga', 'wb'))
-        with open(filename, 'rb') as read_file:
-            c4ga_md5 = md5(read_file.read()).hexdigest()
-        LOG.debug(f'File {filename}.c4ga is the encrypted file with md5: {c4ga_md5}.')
+        LOG.debug(f'File {filename}.c4ga is the encrypted file.')
     except Exception as e:
         LOG.error(f'Something went wrong {e}')
         raise e
-    return (output_file, c4ga_md5)
+    return output_file

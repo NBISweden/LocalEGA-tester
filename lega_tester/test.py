@@ -136,7 +136,7 @@ def fixture_step_encrypt(config, used_file):
     pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
     # Encrypt File
-    test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
+    test_file = encrypt_file(used_file, pub_key)
     # Retrieve session_key and IV to test RES
     with sec_key.unlock(config['encrypt_key_pass']) as privkey:
         header = Header.decrypt(get_header(open(test_file, 'rb'))[1], privkey)
@@ -144,7 +144,7 @@ def fixture_step_encrypt(config, used_file):
         iv = header.records[0].iv.hex()
 
     with open(VALUES_FILE, 'w+') as enc_file:
-        enc_file.write(f'{test_file},{c4ga_md5},{session_key},{iv}')
+        enc_file.write(f'{test_file},{session_key},{iv}')
 
 
 def fixture_step_completed(config, current_id, output_base):
@@ -268,7 +268,7 @@ def main():
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    test_file, _, session_key, iv = read_enc_file_values(used_file)
+    test_file, session_key, iv = read_enc_file_values(used_file)
     test_step_upload(config, test_user, test_file)
     correlation_id = dependency_make_cega_submission(config, test_user, output_base)
 
