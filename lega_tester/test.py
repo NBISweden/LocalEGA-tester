@@ -258,17 +258,19 @@ def main():
 
     args = parser.parse_args()
 
-    used_file = Path(VALUES_FILE)
-    filename = Path(used_file).stem
-    output_base = Path(filename).name
-
+    enc_data = Path(VALUES_FILE)
     # Initialise what is needed
     config = prepare_config(Path(args.config))
     test_user = config['user']
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    test_file, session_key, iv = read_enc_file_values(used_file)
+    test_file, session_key, iv = read_enc_file_values(enc_data)
+
+    enc_file = Path(test_file)
+    filename = Path(enc_file).stem
+    output_base = Path(filename).name
+
     test_step_upload(config, test_user, test_file)
     correlation_id = dependency_make_cega_submission(config, test_user, output_base)
 
@@ -294,10 +296,10 @@ def main():
 
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
-    test_step_res_download(config, filename, fileID, used_file, session_key, iv)
+    test_step_res_download(config, filename, fileID, enc_file, session_key, iv)
 
     dependency_map_file2dataset(config, fileID)
-    test_step_dataedge_download(config, filename, stableID, used_file)
+    test_step_dataedge_download(config, filename, stableID, enc_file)
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
