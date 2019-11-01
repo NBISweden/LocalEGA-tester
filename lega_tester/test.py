@@ -16,7 +16,7 @@ from pathlib import Path
 from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
 
-VALUES_FILE = 'enc_file_values.txt'
+VALUES_FILE = '/volume/enc_file_values.txt'
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
 logging.basicConfig(format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
