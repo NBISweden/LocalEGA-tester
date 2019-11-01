@@ -2,7 +2,8 @@
 import os
 import logging
 import psycopg2
-from tenacity import retry, stop_after_delay, wait_exponential
+from .utils import is_none_p
+from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -50,7 +51,8 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id, ssl_enable):
     conn.close()
     return status
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)))  #noqa: C901
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)),
+       retry=(retry_if_result(is_none_p)))  #noqa: C901
 def ensure_db_status(config, fileID, expected_status):
     """Verify DB status is correct before continuing."""
     status = get_file_status(config['db_in_user'], config['db_name'],
@@ -58,10 +60,9 @@ def ensure_db_status(config, fileID, expected_status):
                              fileID,
                              config['db_ssl'])
     while (status != expected_status):
-        raise TryAgain
+        return None
 
     return status
-
 
 
 def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id, ssl_enable):

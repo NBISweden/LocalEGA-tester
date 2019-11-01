@@ -13,7 +13,7 @@ from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
 from pathlib import Path
-from tenacity import retry, stop_after_delay, wait_exponential
+from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -116,14 +116,15 @@ def fixture_step_db_id(config):
     return current_id
 
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)))  #noqa: C901
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)),
+       retry=(retry_if_result(is_none_p)))  #noqa: C901
 def fixture_step_file_id(config, db_id):
     """Get FileID to the file just uploaded."""
     fileID = get_last_id(config['db_in_user'], config['db_name'],
-                            config['db_in_pass'], config['db_address'],
-                            config['db_ssl'])
+                         config['db_in_pass'], config['db_address'],
+                         config['db_ssl'])
     while (fileID <= db_id):
-        raise TryAgain
+        return None
 
     return fileID
 

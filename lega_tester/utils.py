@@ -23,6 +23,19 @@ def strip_url_scheme(url):
     return parsed.geturl().replace(scheme, '', 1)
 
 
+def is_none_p(value):
+    """Return True if value is None."""
+    return value is None
+
+
+def read_enc_file_values(values_file):
+    """Read values for encrypted file from a file."""
+    with open(values_file, 'r') as f:
+        line = f.readline()
+
+    return tuple(line.split(","))
+
+
 def download_to_file(root_ca, service, payload, output, headers=None):
     """Download file in chunks."""
     with requests.get(service, params=payload, headers=headers,
