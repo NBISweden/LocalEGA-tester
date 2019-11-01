@@ -33,8 +33,8 @@ def open_ssh_connection(hostname, user, key_path, key_pass='password', port=2222
     except paramiko.SSHException as e:
         LOG.error(f'Something went wrong {e}')
         raise Exception('SSHException on ' + hostname)
-
-    return client
+    finally:
+        client.close()
 
 
 def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2222):
