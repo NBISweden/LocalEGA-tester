@@ -7,7 +7,11 @@ if [ "$SIZE" = 'small' ]; then
 elif [ "$SIZE" = "medium" ]; then
     fallocate -l 2g /volume/"$test_file"
 elif [ "$SIZE" = "large" ]; then
-    fallocate -l 80g /volume/"$test_file"
+    fallocate -l 10g /volume/"$test_file"
+elif [ "$SIZE" = "xlarge" ]; then
+    fallocate -l 25g /volume/"$test_file"
+elif [ "$SIZE" = "xxlarge" ]; then
+    fallocate -l 50g /volume/"$test_file"
 else
     echo "file size not set"
     exit 1
