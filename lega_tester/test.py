@@ -11,7 +11,7 @@ from .utils import download_to_file, compare_files, is_none_p, read_enc_file_val
 from .archive_ops import list_s3_objects, check_file_exists
 from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
-from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
+from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
 from pathlib import Path
 from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
@@ -174,7 +174,6 @@ def fixture_step_purge(config):
                   config['tls_key_tester'],
                   port=config['cm_port'])
 
-
 # FAKING CEGA DEPENDENCIES
 
 
@@ -303,6 +302,9 @@ def main():
     LOG.debug('-------------------------------------')
 
     LOG.debug('Cleaning up ...')
+    sftp_remove(config['inbox_address'], test_user, test_file,
+                os.path.expanduser(config['user_key']),
+                port=int(config['inbox_port']))
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     LOG.info('Should be all!')

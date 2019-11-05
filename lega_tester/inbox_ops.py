@@ -60,6 +60,27 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         transport.close()
 
 
+def sftp_remove(hostname, user, file_path, key_path, key_pass='password', port=2222):
+    """SFTP Client file upload."""
+    try:
+        k = paramiko.RSAKey.from_private_key_file(key_path, password=key_pass)
+        transport = paramiko.Transport((hostname, port))
+        transport.connect(username=user, pkey=k)
+        transport.set_keepalive(60)
+        LOG.debug(f'sftp connected to {hostname}:{port} with {user}')
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        filename, _ = os.path.splitext(file_path)
+        output_base = os.path.basename(filename)
+        sftp.remove(f'{output_base}.c4ga')
+        LOG.info(f'Clean up: file removed {output_base}.c4ga')
+    except Exception as e:
+        LOG.error(f'Something went wrong {e}')
+        raise e
+    finally:
+        LOG.debug('sftp done')
+        transport.close()
+
+
 def encrypt_file(file_path, pubkey):
     """Encrypt file and extract its md5."""
     file_size = os.path.getsize(file_path)
