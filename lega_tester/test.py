@@ -293,8 +293,6 @@ def main():
     # needed for downloading
     ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
-
-    fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     test_step_res_download(config, filename, fileID, original_file, session_key, iv)
 
@@ -302,6 +300,10 @@ def main():
     test_step_dataedge_download(config, filename, stableID, original_file)
 
     LOG.debug('Outgestion DONE')
+    LOG.debug('-------------------------------------')
+
+    LOG.debug('Cleaning up ...')
+    fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     LOG.info('Should be all!')
 
