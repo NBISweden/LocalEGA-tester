@@ -118,7 +118,7 @@ def fixture_step_db_id(config):
     return current_id
 
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(300)),
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(14400)),
        retry=(retry_if_result(is_none_p)))  #noqa: C901
 def fixture_step_file_id(config, db_id):
     """Get FileID to the file just uploaded."""

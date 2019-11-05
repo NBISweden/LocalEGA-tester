@@ -51,7 +51,7 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id, ssl_enable):
     conn.close()
     return status
 
-@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(3600)),
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(14400)),
        retry=(retry_if_result(is_none_p)))  #noqa: C901
 def ensure_db_status(config, fileID, expected_status):
     """Verify DB status is correct before continuing."""
