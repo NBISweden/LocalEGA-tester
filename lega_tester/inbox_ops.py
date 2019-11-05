@@ -42,6 +42,7 @@ def sftp_upload(hostname, user, file_path, key_path, key_pass='password', port=2
         k = paramiko.RSAKey.from_private_key_file(key_path, password=key_pass)
         transport = paramiko.Transport((hostname, port))
         transport.connect(username=user, pkey=k)
+        transport.set_keepalive(60)
         LOG.debug(f'sftp connected to {hostname}:{port} with {user}')
         sftp = paramiko.SFTPClient.from_transport(transport)
         filename, _ = os.path.splitext(file_path)
