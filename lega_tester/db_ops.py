@@ -2,6 +2,8 @@
 import os
 import logging
 import psycopg2
+from .utils import is_none_p
+from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -47,6 +49,19 @@ def get_file_status(db_user, db_name, db_pass, db_host, file_id, ssl_enable):
     LOG.debug(f"File status: {status}")
     cursor.close()
     conn.close()
+    return status
+
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(14400)),
+       retry=(retry_if_result(is_none_p)))  #noqa: C901
+def ensure_db_status(config, fileID, expected_status):
+    """Verify DB status is correct before continuing."""
+    status = get_file_status(config['db_in_user'], config['db_name'],
+                             config['db_in_pass'], config['db_address'],
+                             fileID,
+                             config['db_ssl'])
+    while (status != expected_status):
+        return None
+
     return status
 
 

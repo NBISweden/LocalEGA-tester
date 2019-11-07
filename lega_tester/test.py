@@ -7,14 +7,16 @@ from legacryptor.crypt4gh import Header, get_header
 import pgpy
 import argparse
 import yaml
-import time
-from .utils import download_to_file, compare_files
-from .archive_ops import list_s3_objects
-from .db_ops import get_last_id, get_file_status, file2dataset_map
+from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
+from .archive_ops import list_s3_objects, check_file_exists
+from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
-from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload
+from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
 from pathlib import Path
+from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
+
+VALUES_FILE = '/volume/enc_file_values.txt'
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
 logging.basicConfig(format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
@@ -48,21 +50,24 @@ def test_step_upload(config, test_user, test_file):
 
 def test_step_check_archive(config, fileID):
     """Check the archive if the file was archived."""
-    # Wait for file status
-    status = ''
-    while (status != 'COMPLETED'):
-        time.sleep(1)
-        status = get_file_status(config['db_in_user'], config['db_name'],
-                                 config['db_in_pass'], config['db_address'],
-                                 fileID,
-                                 config['db_ssl'])
-    if config['data_storage_type'] == "S3Storage":
+    # default to S3 Archive as this is default setup.
+    if 'data_storage_type' in config and config['data_storage_type']:
+        storage_type = config['data_storage_type']
+    else:
+        storage_type = "S3Storage"
+    if storage_type == "S3Storage":
+        check_file_exists(config['s3_address'], config['s3_bucket'],
+                          config['s3_region'], fileID,
+                          config['s3_access'], config['s3_secret'],
+                          config['s3_ssl'],
+                          config['tls_ca_root_file'])
+        # While we are at it let us see what is inside the S3 Archive
         list_s3_objects(config['s3_address'], config['s3_bucket'],
                         config['s3_region'], fileID,
                         config['s3_access'], config['s3_secret'],
                         config['s3_ssl'],
                         config['tls_ca_root_file'])
-    elif config['data_storage_type'] == "FileStorage":
+    elif storage_type == "FileStorage":
         assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
         file_path = Path(f'/ega/archive/{fileID}')
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
@@ -113,19 +118,33 @@ def fixture_step_db_id(config):
     return current_id
 
 
-def fixture_step_encrypt(config, used_file):
+@retry(wait=wait_exponential(multiplier=1, min=4, max=10), stop=(stop_after_delay(14400)),
+       retry=(retry_if_result(is_none_p)))  #noqa: C901
+def fixture_step_file_id(config, db_id):
+    """Get FileID to the file just uploaded."""
+    fileID = get_last_id(config['db_in_user'], config['db_name'],
+                         config['db_in_pass'], config['db_address'],
+                         config['db_ssl'])
+    while (fileID <= db_id):
+        return None
+
+    return fileID
+
+
+def fixture_step_encrypt(config, original_file):
     """Encrypt file and retrieve necessary info for test."""
     pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
     sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
     # Encrypt File
-    test_file, c4ga_md5 = encrypt_file(used_file, pub_key)
+    test_file = encrypt_file(original_file, pub_key)
     # Retrieve session_key and IV to test RES
     with sec_key.unlock(config['encrypt_key_pass']) as privkey:
         header = Header.decrypt(get_header(open(test_file, 'rb'))[1], privkey)
         session_key = header.records[0].session_key.hex()
         iv = header.records[0].iv.hex()
 
-    return test_file, c4ga_md5, session_key, iv
+    with open(VALUES_FILE, 'w+') as enc_file:
+        enc_file.write(f'{original_file},{test_file},{session_key},{iv}')
 
 
 def fixture_step_completed(config, current_id, output_base):
@@ -145,12 +164,8 @@ def fixture_step_completed(config, current_id, output_base):
 
 
 def fixture_step_purge(config):
-    """Test if file has completed both in MQ and in DB."""
-    # Once the file has been ingested it should be the last ID in the database
-    # We use this ID everywhere including donwload from DataEdge
-    # In future versions once we fix DB schema we will use StableID for download
+    """Purge MQ queues, to clean after test."""
     cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
-    # wait for submission to go through
     purge_cega_mq(cm_protocol, config['cm_address'], config['cm_user'],
                   config['cm_vhost'],
                   config['cm_pass'],
@@ -158,7 +173,6 @@ def fixture_step_purge(config):
                   config['tls_cert_tester'],
                   config['tls_key_tester'],
                   port=config['cm_port'])
-
 
 # FAKING CEGA DEPENDENCIES
 
@@ -218,8 +232,8 @@ def dependency_map_file2dataset(config, fileID):
                      config['db_ssl'])
 
 
-def main():
-    """Do the sparkles and fireworks."""
+def enc_file():
+    """Encrypt file and store information about it."""
     parser = argparse.ArgumentParser(description="End to end test for LocalEGA,\
                                                   with YAML configuration.")
 
@@ -228,43 +242,70 @@ def main():
     parser.add_argument('config', help='Configuration file.')
 
     args = parser.parse_args()
-    used_file = Path(args.input)
-    filename = Path(used_file).stem
-    output_base = Path(filename).name
+    original_file = Path(args.input)
+    config = prepare_config(Path(args.config))
+    fixture_step_encrypt(config, original_file)
+    LOG.debug('-------------------------------------')
+    LOG.info('file encrypted!')
 
+
+def main():
+    """Do the sparkles and fireworks."""
+    parser = argparse.ArgumentParser(description="End to end test for LocalEGA,\
+                                                  with YAML configuration.")
+    parser.add_argument('config', help='Configuration file.')
+
+    args = parser.parse_args()
+
+    enc_data = Path(VALUES_FILE)
     # Initialise what is needed
     config = prepare_config(Path(args.config))
     test_user = config['user']
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    test_file, _, session_key, iv = fixture_step_encrypt(config, used_file)
+    original_file, test_file, session_key, iv = read_enc_file_values(enc_data)
+
+    enc_file = Path(test_file)
+    filename = Path(enc_file).stem
+    output_base = Path(filename).name
+
     test_step_upload(config, test_user, test_file)
     correlation_id = dependency_make_cega_submission(config, test_user, output_base)
 
     # Stable ID should be sent by CentralEGA
     stableID = 'EGAF'+''.join(secrets.choice(string.digits) for i in range(16))
-    fileID = 0
-    while (fileID <= db_id):
-        time.sleep(1)
-        fileID = get_last_id(config['db_in_user'], config['db_name'],
-                             config['db_in_pass'], config['db_address'],
-                             config['db_ssl'])
+    fileID = fixture_step_file_id(config, db_id)
 
+    # Wait for file status
+    # check that verify did its job and put the file in COMPLETED
+    ensure_db_status(config, fileID, "COMPLETED")
+
+    # check file is in archive
     test_step_check_archive(config, fileID)
+
     # Additional step and not really needed
     fixture_step_completed(config, current_id, output_base)
     dependency_make_cega_stableID(config, fileID, correlation_id, stableID)
+
+    # check that finalize did its job and put the file in READY
+    # needed for downloading
+    ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
-    time.sleep(10)
-    fixture_step_purge(config)
     LOG.debug('-------------------------------------')
-    test_step_res_download(config, filename, fileID, used_file, session_key, iv)
+    test_step_res_download(config, filename, fileID, original_file, session_key, iv)
 
     dependency_map_file2dataset(config, fileID)
-    test_step_dataedge_download(config, filename, stableID, used_file)
+    test_step_dataedge_download(config, filename, stableID, original_file)
 
     LOG.debug('Outgestion DONE')
+    LOG.debug('-------------------------------------')
+
+    LOG.debug('Cleaning up ...')
+    sftp_remove(config['inbox_address'], test_user, test_file,
+                os.path.expanduser(config['user_key']),
+                port=int(config['inbox_port']))
+    fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     LOG.info('Should be all!')
 

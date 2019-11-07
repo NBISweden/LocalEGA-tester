@@ -1,18 +1,27 @@
 #!/bin/sh
 
+test_file=$(date +"%Y-%m-%d_%H-%M-%S")
+
 if [ "$SIZE" = 'small' ]; then
-    FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/sequence_read/ERR013140.filt.fastq.gz"
+    fallocate -l 10m /volume/"$test_file"
 elif [ "$SIZE" = "medium" ]; then
-    FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/sequence_read/SRR099966_1.filt.fastq.gz"
+    fallocate -l 2g /volume/"$test_file"
 elif [ "$SIZE" = "large" ]; then
-    FILE="ftp://ftp.1000genomes.ebi.ac.uk/vol1/ftp/phase3/data/HG00100/alignment/HG00100.mapped.ILLUMINA.bwa.GBR.low_coverage.20130415.bam"
+    fallocate -l 10g /volume/"$test_file"
+elif [ "$SIZE" = "xlarge" ]; then
+    fallocate -l 25g /volume/"$test_file"
+elif [ "$SIZE" = "xxlarge" ]; then
+    fallocate -l 50g /volume/"$test_file"
 else
     echo "file size not set"
     exit 1
 fi
 
-test_file=$(date +"%Y-%m-%d_%H-%M-%S")
-wget -O /volume/$test_file $FILE
+if [ -f "/etc/ssl/certs/ca-certificates.crt" ]; then
+  cat /conf/root.ca.crt /etc/ssl/certs/ca-certificates.crt > /volume/ca-certificates
+
+fi
 
 sleep 3
-legatest /volume/$test_file /conf/config.yaml
+legaenc /volume/"$test_file" /conf/config.yaml
+legatest /conf/config.yaml
