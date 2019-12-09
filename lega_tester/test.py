@@ -73,22 +73,6 @@ def test_step_check_archive(config, fileID):
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
-def test_step_res_download(config, filename, fileID, used_file, session_key, iv):
-    """Test download from RES service.
-
-    Not necessary but good to have and see before testing dataedge
-    """
-    # Verify that the file can be downloaded from RES using the session_key and IV
-    res_file = f'/volume/{filename}.res'
-    res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
-    res_url = f"https://{config['res_address']}:{config['res_port']}/file"
-    # download_to_file(res_url, res_payload, res_file,
-    #                  config['tls_cert_tester'],
-    #                  config['tls_key_tester'])
-    download_to_file(config['tls_ca_root_file'], res_url, res_payload, res_file)
-    compare_files('RES', res_file, used_file)
-
-
 def test_step_dataedge_download(config, filename, stableID, used_file):
     """Test download from DataEdge service."""
     # Verify that the file can be downloaded from DataEdge
@@ -293,7 +277,6 @@ def main():
     ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
     LOG.debug('-------------------------------------')
-    test_step_res_download(config, filename, fileID, original_file, session_key, iv)
 
     dependency_map_file2dataset(config, fileID)
     test_step_dataedge_download(config, filename, stableID, original_file)
