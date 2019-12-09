@@ -2,7 +2,8 @@ import paramiko
 import os
 import logging
 from tenacity import retry, stop_after_delay, wait_fixed
-from legacryptor.crypt4gh import encrypt
+from crypt4gh.engine import encrypt
+from crypt4gh.keys import get_private_key, get_public_key
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -81,16 +82,24 @@ def sftp_remove(hostname, user, file_path, key_path, key_pass='password', port=2
         transport.close()
 
 
-def encrypt_file(file_path, pubkey):
-    """Encrypt file and extract its md5."""
-    file_size = os.path.getsize(file_path)
+def encrypt_file(file_path, recipient_pubkey, private_key, passphrase):
+    """Encrypt file."""
     filename, _ = os.path.splitext(file_path)
     output_file = os.path.expanduser(f'{filename}.c4ga')
+    # list of (method, privkey, recipient_pubkey=None)
+    # method supported is 0 https://github.com/EGA-archive/crypt4gh/blob/v1.0/crypt4gh/header.py#L261
+
+    def cb():
+        return passphrase
+
+    pubkey = get_public_key(recipient_pubkey)
+    seckey = get_private_key(private_key, cb)
+    keys = [(0, seckey, pubkey)]
     infile = open(file_path, 'rb')
     try:
-        encrypt(pubkey, infile, file_size, open(f'{filename}.c4ga', 'wb'))
-        LOG.debug(f'File {filename}.c4ga is the encrypted file.')
+        encrypt(keys, infile, open(f'{filename}.c4ga', 'wb'), offset=0, span=None)
+        print(f'File {filename}.c4ga is the encrypted file.')
     except Exception as e:
-        LOG.error(f'Something went wrong {e}')
+        print(f'Something went wrong {e}')
         raise e
     return output_file

@@ -5,6 +5,7 @@ localega:
   # User secret private RSA key.
   user_key: /config/dummy.key
   # Public key file to encrypt file.
+  # This is also the recipient public key
   encrypt_key_public: /config/key.1.pub
   # Private key file to encrypt file.
   encrypt_key_private: /config/key.1.sec

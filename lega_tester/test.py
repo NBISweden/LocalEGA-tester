@@ -3,8 +3,6 @@ import secrets
 import string
 import sys
 import logging
-from legacryptor.crypt4gh import Header, get_header
-import pgpy
 import argparse
 import yaml
 from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
@@ -117,18 +115,14 @@ def fixture_step_file_id(config, db_id):
 
 def fixture_step_encrypt(config, original_file):
     """Encrypt file and retrieve necessary info for test."""
-    pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
-    sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
     # Encrypt File
-    test_file = encrypt_file(original_file, pub_key)
-    # Retrieve session_key and IV to test RES
-    with sec_key.unlock(config['encrypt_key_pass']) as privkey:
-        header = Header.decrypt(get_header(open(test_file, 'rb'))[1], privkey)
-        session_key = header.records[0].session_key.hex()
-        iv = header.records[0].iv.hex()
+    test_file = encrypt_file(original_file,
+                             Path(config['encrypt_key_public']),
+                             Path(config['encrypt_key_private']),
+                             config['encrypt_key_pass'])
 
     with open(VALUES_FILE, 'w+') as enc_file:
-        enc_file.write(f'{original_file},{test_file},{session_key},{iv}')
+        enc_file.write(f'{original_file},{test_file}')
 
 
 def fixture_step_completed(config, current_id, output_base):
@@ -248,7 +242,7 @@ def main():
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    original_file, test_file, session_key, iv = read_enc_file_values(enc_data)
+    original_file, test_file = read_enc_file_values(enc_data)
 
     enc_file = Path(test_file)
     filename = Path(enc_file).stem
