@@ -5,6 +5,6 @@ paramiko
 boto3
 PyYAML
 requests
-git+https://github.com/neicnordic/LocalEGA-cryptor.git
+crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.0
 psycopg2-binary
 tenacity

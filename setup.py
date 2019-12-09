@@ -21,7 +21,7 @@ setup(
         'requests',
         'psycopg2-binary',
         'tenacity',
-        'legacryptor @ git+https://github.com/neicnordic/LocalEGA-cryptor',
+        'crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.0',
     ],
     entry_points={
         'console_scripts': [
