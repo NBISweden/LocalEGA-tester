@@ -43,17 +43,22 @@ def test_step_upload(config, test_user, test_file):
     """Do the first step of the test, send file to inbox."""
     # Test Inbox Connection before anything
     if config['inbox_s3']:
+        verify_s3_inbox_ssl = False
+        if config['inbox_s3_public'] and config['s3_ssl']:
+            verify_s3_inbox_ssl = True
+        elif config['s3_ssl']:
+            verify_s3_inbox_ssl = config['tls_ca_root_file']
         # Assumes each user has a bucket
         s3_connection(config['inbox_s3_address'], test_user,
                       config['inbox_s3_region'],
                       config['inbox_s3_access'], config['inbox_s3_secret'],
                       config['inbox_s3_ssl'],
-                      config['tls_ca_root_file'])
+                      verify_s3_inbox_ssl)
         s3_upload(config['inbox_s3_address'], test_user,
                   config['inbox_s3_region'], test_file,
                   config['inbox_s3_access'], config['inbox_s3_secret'],
                   config['inbox_s3_ssl'],
-                  config['tls_ca_root_file'])
+                  verify_s3_inbox_ssl)
     else:
         key_pk = os.path.expanduser(config['user_key'])
         open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
@@ -68,17 +73,22 @@ def test_step_check_archive(config, fileID):
     else:
         storage_type = "S3Storage"
     if storage_type == "S3Storage":
+        verify_s3_ssl = False
+        if config['s3_public'] and config['s3_ssl']:
+            verify_s3_ssl = True
+        elif config['s3_ssl']:
+            verify_s3_ssl = config['tls_ca_root_file']
         check_file_exists(config['s3_address'], config['s3_bucket'],
                           config['s3_region'], fileID,
                           config['s3_access'], config['s3_secret'],
                           config['s3_ssl'],
-                          config['tls_ca_root_file'])
+                          verify_s3_ssl)
         # While we are at it let us see what is inside the S3 Archive
         list_s3_objects(config['s3_address'], config['s3_bucket'],
                         config['s3_region'], fileID,
                         config['s3_access'], config['s3_secret'],
                         config['s3_ssl'],
-                        config['tls_ca_root_file'])
+                        verify_s3_ssl)
     elif storage_type == "FileStorage":
         assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
         file_path = Path(f'/ega/archive/{fileID}')

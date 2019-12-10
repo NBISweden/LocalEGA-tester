@@ -23,6 +23,8 @@ localega:
   inbox_s3_secret:
   inbox_s3_region: lega
   inbox_s3_ssl: false
+  # if the S3 Inbox is public set this below true
+  inbox_s3_public: false
   # Parameters for SFTP based inbox
   inbox_address: localega-inbox
   inbox_port: 2222
@@ -31,6 +33,8 @@ localega:
   # S3 Archive address, or service name, should include port number
   # if s3_address includes `http` it will be removed
   s3_ssl: false
+  # if the S3 Archive is public set this below true
+  s3_public: false
   s3_address:
   s3_access:
   s3_secret:
