@@ -4,6 +4,7 @@ import logging
 from tenacity import retry, stop_after_delay, wait_fixed
 from crypt4gh.engine import encrypt
 from crypt4gh.keys import get_private_key, get_public_key
+import boto3
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -80,6 +81,53 @@ def sftp_remove(hostname, user, file_path, key_path, key_pass='password', port=2
     finally:
         LOG.debug('sftp done')
         transport.close()
+
+
+def s3_connection(address, bucket_name, region_name, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    boto3.client('s3', endpoint_url=address,
+                 use_ssl=ssl_enable, aws_access_key_id=access,
+                 aws_secret_access_key=secret,
+                 config=boto3.session.Config(signature_version='s3v4'),
+                 region_name=region_name,
+                 verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+
+
+def s3_upload(address, bucket_name, region_name, file_path, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    s3 = boto3.client('s3', endpoint_url=address,
+                      use_ssl=ssl_enable, aws_access_key_id=access,
+                      aws_secret_access_key=secret,
+                      config=boto3.session.Config(signature_version='s3v4'),
+                      region_name=region_name,
+                      verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+    # upload_file method is handled by the S3 Transfer Manager
+    # put_object will attempt to send the entire body in one request
+    # and does not handle multipart upload
+    filename, _ = os.path.splitext(file_path)
+    output_base = os.path.basename(filename)
+    if os.path.isfile(file_path):
+        s3.upload_file(file_path, bucket_name, f'{output_base}.c4ga')
+    else:
+        raise IOError('Could not find localFile {file_path} !!')
+    LOG.info(f'file uploaded {file_path} | PASS |')
+
+
+def s3_remove(address, bucket_name, region_name, file_path, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    s3 = boto3.resource('s3', endpoint_url=address,
+                        use_ssl=ssl_enable, aws_access_key_id=access,
+                        aws_secret_access_key=secret,
+                        config=boto3.session.Config(signature_version='s3v4'),
+                        region_name=region_name,
+                        verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+    my_bucket = s3.Bucket(bucket_name)
+    filename, _ = os.path.splitext(file_path)
+    output_base = os.path.basename(filename)
+    my_bucket.delete_key(f'{output_base}.c4ga')
 
 
 def encrypt_file(file_path, recipient_pubkey, private_key, passphrase):
