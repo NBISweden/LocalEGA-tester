@@ -10,6 +10,7 @@ from .archive_ops import list_s3_objects, check_file_exists
 from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
+from .inbox_ops import s3_connection, s3_upload
 from pathlib import Path
 from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
@@ -40,10 +41,23 @@ def prepare_config(conf):
 
 def test_step_upload(config, test_user, test_file):
     """Do the first step of the test, send file to inbox."""
-    key_pk = os.path.expanduser(config['user_key'])
     # Test Inbox Connection before anything
-    open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
-    sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
+    if config['inbox_s3']:
+        # Assumes each user has a bucket
+        s3_connection(config['inbox_s3_address'], test_user,
+                      config['inbox_s3_region'],
+                      config['inbox_s3_access'], config['inbox_s3_secret'],
+                      config['inbox_s3_ssl'],
+                      config['tls_ca_root_file'])
+        s3_upload(config['inbox_s3_address'], test_user,
+                  config['inbox_s3_region'], test_file,
+                  config['inbox_s3_access'], config['inbox_s3_secret'],
+                  config['inbox_s3_ssl'],
+                  config['tls_ca_root_file'])
+    else:
+        key_pk = os.path.expanduser(config['user_key'])
+        open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
+        sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
 
 
 def test_step_check_archive(config, fileID):

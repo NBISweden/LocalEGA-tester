@@ -15,10 +15,20 @@ localega:
   tls_cert_tester: /config/tester.ca.crt
   tls_key_tester: /config/tester.ca.key
   tls_ca_root_file: /config/root.ca.crt
+  # If inbox_s3 set to true it will ignore
+  # sftp inbox parameters
+  inbox_s3: false
+  inbox_s3_address: localega-s3-inbox
+  inbox_s3_access:
+  inbox_s3_secret:
+  inbox_s3_region: lega
+  inbox_s3_ssl: false
+  # Parameters for SFTP based inbox
   inbox_address: localega-inbox
   inbox_port: 2222
   data_storage_type: "S3Storage" # S3Storage or FileStorage
-  # S3 address, or service name, should include port number
+
+  # S3 Archive address, or service name, should include port number
   # if s3_address includes `http` it will be removed
   s3_ssl: false
   s3_address:
