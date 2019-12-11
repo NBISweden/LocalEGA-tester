@@ -48,9 +48,6 @@ localega:
   cm_user:
   cm_vhost:
   cm_pass:
-  # RES address or service name and port
-  res_address: localega-res
-  res_port: 9090
   # DataEdge address or service name and port
   dataedge_address: localega-dataedge
   dataedge_port: 9059
