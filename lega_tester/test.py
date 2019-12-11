@@ -3,8 +3,6 @@ import secrets
 import string
 import sys
 import logging
-from legacryptor.crypt4gh import Header, get_header
-import pgpy
 import argparse
 import yaml
 from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
@@ -12,6 +10,7 @@ from .archive_ops import list_s3_objects, check_file_exists
 from .db_ops import get_last_id, ensure_db_status, file2dataset_map
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
+from .inbox_ops import s3_connection, s3_upload
 from pathlib import Path
 from tenacity import retry, stop_after_delay, wait_exponential, retry_if_result
 
@@ -42,10 +41,28 @@ def prepare_config(conf):
 
 def test_step_upload(config, test_user, test_file):
     """Do the first step of the test, send file to inbox."""
-    key_pk = os.path.expanduser(config['user_key'])
     # Test Inbox Connection before anything
-    open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
-    sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
+    if config['inbox_s3']:
+        verify_s3_inbox_ssl = False
+        if config['inbox_s3_public'] and config['s3_ssl']:
+            verify_s3_inbox_ssl = True
+        elif config['s3_ssl']:
+            verify_s3_inbox_ssl = config['tls_ca_root_file']
+        # Assumes each user has a bucket
+        s3_connection(config['inbox_s3_address'], test_user,
+                      config['inbox_s3_region'],
+                      config['inbox_s3_access'], config['inbox_s3_secret'],
+                      config['inbox_s3_ssl'],
+                      verify_s3_inbox_ssl)
+        s3_upload(config['inbox_s3_address'], test_user,
+                  config['inbox_s3_region'], test_file,
+                  config['inbox_s3_access'], config['inbox_s3_secret'],
+                  config['inbox_s3_ssl'],
+                  verify_s3_inbox_ssl)
+    else:
+        key_pk = os.path.expanduser(config['user_key'])
+        open_ssh_connection(config['inbox_address'], test_user, key_pk, port=int(config['inbox_port']))
+        sftp_upload(config['inbox_address'], test_user, test_file, key_pk, port=int(config['inbox_port']))
 
 
 def test_step_check_archive(config, fileID):
@@ -56,53 +73,42 @@ def test_step_check_archive(config, fileID):
     else:
         storage_type = "S3Storage"
     if storage_type == "S3Storage":
+        verify_s3_ssl = False
+        if config['s3_public'] and config['s3_ssl']:
+            verify_s3_ssl = True
+        elif config['s3_ssl']:
+            verify_s3_ssl = config['tls_ca_root_file']
         check_file_exists(config['s3_address'], config['s3_bucket'],
                           config['s3_region'], fileID,
                           config['s3_access'], config['s3_secret'],
                           config['s3_ssl'],
-                          config['tls_ca_root_file'])
+                          verify_s3_ssl)
         # While we are at it let us see what is inside the S3 Archive
         list_s3_objects(config['s3_address'], config['s3_bucket'],
                         config['s3_region'], fileID,
                         config['s3_access'], config['s3_secret'],
                         config['s3_ssl'],
-                        config['tls_ca_root_file'])
+                        verify_s3_ssl)
     elif storage_type == "FileStorage":
         assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
         file_path = Path(f'/ega/archive/{fileID}')
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
-def test_step_res_download(config, filename, fileID, used_file, session_key, iv):
-    """Test download from RES service.
-
-    Not necessary but good to have and see before testing dataedge
-    """
-    # Verify that the file can be downloaded from RES using the session_key and IV
-    res_file = f'/volume/{filename}.res'
-    res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
-    res_url = f"https://{config['res_address']}:{config['res_port']}/file"
-    # download_to_file(res_url, res_payload, res_file,
-    #                  config['tls_cert_tester'],
-    #                  config['tls_key_tester'])
-    download_to_file(config['tls_ca_root_file'], res_url, res_payload, res_file)
-    compare_files('RES', res_file, used_file)
-
-
-def test_step_dataedge_download(config, filename, stableID, used_file):
-    """Test download from DataEdge service."""
-    # Verify that the file can be downloaded from DataEdge
-    # We are using a token that can be validated by DataEdge
+def test_step_doa_download(config, filename, stableID, used_file):
+    """Test download from doa service."""
+    # Verify that the file can be downloaded from doa
+    # We are using a token that can be validated by doa
     token = config['token']
-    dataedge_file = f'/volume/{filename}.dataedge'
+    doa_file = f'/volume/{filename}.doa'
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
-    dataedge_url = f"https://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
-    # download_to_file(dataedge_url, edge_payload, dataedge_file,
+    doa_url = f"https://{config['doa_address']}:{config['doa_port']}/files/{stableID}"
+    # download_to_file(doa_url, edge_payload, doa_file,
     #                  config['tls_cert_tester'],
     #                  config['tls_key_tester'], headers=edge_headers)
-    download_to_file(config['tls_ca_root_file'], dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
-    compare_files('DataEdge', dataedge_file, used_file)
+    download_to_file(config['tls_ca_root_file'], doa_url, edge_payload, doa_file, headers=edge_headers)
+    compare_files('doa', doa_file, used_file)
 
 
 # FIXTURES
@@ -133,24 +139,20 @@ def fixture_step_file_id(config, db_id):
 
 def fixture_step_encrypt(config, original_file):
     """Encrypt file and retrieve necessary info for test."""
-    pub_key, _ = pgpy.PGPKey.from_file(Path(config['encrypt_key_public']))
-    sec_key, _ = pgpy.PGPKey.from_file(config['encrypt_key_private'])
     # Encrypt File
-    test_file = encrypt_file(original_file, pub_key)
-    # Retrieve session_key and IV to test RES
-    with sec_key.unlock(config['encrypt_key_pass']) as privkey:
-        header = Header.decrypt(get_header(open(test_file, 'rb'))[1], privkey)
-        session_key = header.records[0].session_key.hex()
-        iv = header.records[0].iv.hex()
+    test_file = encrypt_file(original_file,
+                             Path(config['encrypt_key_public']),
+                             Path(config['encrypt_key_private']),
+                             config['encrypt_key_pass'])
 
     with open(VALUES_FILE, 'w+') as enc_file:
-        enc_file.write(f'{original_file},{test_file},{session_key},{iv}')
+        enc_file.write(f'{original_file},{test_file}')
 
 
 def fixture_step_completed(config, current_id, output_base):
     """Test if file has completed both in MQ and in DB."""
     # Once the file has been ingested it should be the last ID in the database
-    # We use this ID everywhere including donwload from DataEdge
+    # We use this ID everywhere including donwload from doa
     # In future versions once we fix DB schema we will use StableID for download
     cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
     # wait for submission to go through
@@ -219,8 +221,8 @@ def dependency_make_cega_stableID(config, fileID, correlation_id, stableID):
 
 
 def dependency_map_file2dataset(config, fileID):
-    """Map file to dataset for retrieving file via dataedge."""
-    LOG.debug('Mapping file to dataset for retrieving file via dataedge.')
+    """Map file to dataset for retrieving file via doa."""
+    LOG.debug('Mapping file to dataset for retrieving file via doa.')
 
     # There is no component asigning permissions for files in datasets
     # Thus we need this step
@@ -264,7 +266,7 @@ def main():
 
     db_id = fixture_step_db_id(config)
     current_id = 1 if db_id == 0 else db_id
-    original_file, test_file, session_key, iv = read_enc_file_values(enc_data)
+    original_file, test_file = read_enc_file_values(enc_data)
 
     enc_file = Path(test_file)
     filename = Path(enc_file).stem
@@ -293,10 +295,9 @@ def main():
     ensure_db_status(config, fileID, "READY")
     LOG.debug('Ingestion DONE')
     LOG.debug('-------------------------------------')
-    test_step_res_download(config, filename, fileID, original_file, session_key, iv)
 
     dependency_map_file2dataset(config, fileID)
-    test_step_dataedge_download(config, filename, stableID, original_file)
+    test_step_doa_download(config, filename, stableID, original_file)
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='lega_tester',
-    version='0.4.0',
+    version='0.4.1',
     packages=find_packages(),
     py_modules=['lega_tester'],
     include_package_data=True,
@@ -21,7 +21,7 @@ setup(
         'requests',
         'psycopg2-binary',
         'tenacity',
-        'legacryptor @ git+https://github.com/neicnordic/LocalEGA-cryptor',
+        'crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.0',
     ],
     entry_points={
         'console_scripts': [

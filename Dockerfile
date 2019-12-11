@@ -1,4 +1,4 @@
-FROM python:3.6-alpine3.8 as BUILD
+FROM python:3.6-alpine3.10 as BUILD
 
 RUN apk add --no-cache git postgresql-libs postgresql-dev gcc musl-dev libffi-dev make gnupg && \
     rm -rf /var/cache/apk/*
@@ -11,7 +11,7 @@ RUN pip install --upgrade pip && \
     pip install -r /root/legatester/requirements.txt && \
     pip install /root/legatester
 
-FROM python:3.6-alpine3.8
+FROM python:3.6-alpine3.10
 
 LABEL maintainer "NeIC System Developers"
 LABEL org.label-schema.schema-version="1.0"

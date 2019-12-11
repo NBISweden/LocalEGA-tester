@@ -2,7 +2,9 @@ import paramiko
 import os
 import logging
 from tenacity import retry, stop_after_delay, wait_fixed
-from legacryptor.crypt4gh import encrypt
+from crypt4gh.engine import encrypt
+from crypt4gh.keys import get_private_key, get_public_key
+import boto3
 
 
 FORMAT = '[%(asctime)s][%(name)s][%(process)d %(processName)s][%(levelname)-8s] (L:%(lineno)s) %(funcName)s: %(message)s'
@@ -81,16 +83,71 @@ def sftp_remove(hostname, user, file_path, key_path, key_pass='password', port=2
         transport.close()
 
 
-def encrypt_file(file_path, pubkey):
-    """Encrypt file and extract its md5."""
-    file_size = os.path.getsize(file_path)
+def s3_connection(address, bucket_name, region_name, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    boto3.client('s3', endpoint_url=address,
+                 use_ssl=ssl_enable, aws_access_key_id=access,
+                 aws_secret_access_key=secret,
+                 config=boto3.session.Config(signature_version='s3v4'),
+                 region_name=region_name,
+                 verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+
+
+def s3_upload(address, bucket_name, region_name, file_path, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    s3 = boto3.client('s3', endpoint_url=address,
+                      use_ssl=ssl_enable, aws_access_key_id=access,
+                      aws_secret_access_key=secret,
+                      config=boto3.session.Config(signature_version='s3v4'),
+                      region_name=region_name,
+                      verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+    # upload_file method is handled by the S3 Transfer Manager
+    # put_object will attempt to send the entire body in one request
+    # and does not handle multipart upload
+    filename, _ = os.path.splitext(file_path)
+    output_base = os.path.basename(filename)
+    if os.path.isfile(file_path):
+        s3.upload_file(file_path, bucket_name, f'{output_base}.c4ga')
+    else:
+        raise IOError('Could not find localFile {file_path} !!')
+    LOG.info(f'file uploaded {file_path} | PASS |')
+
+
+def s3_remove(address, bucket_name, region_name, file_path, access, secret, ssl_enable, root_ca):
+    """Upload file to a bucket."""
+    s3 = boto3.resource('s3', endpoint_url=address,
+                        use_ssl=ssl_enable, aws_access_key_id=access,
+                        aws_secret_access_key=secret,
+                        config=boto3.session.Config(signature_version='s3v4'),
+                        region_name=region_name,
+                        verify=root_ca)
+    LOG.debug(f'Connected to S3: {address}.')
+    my_bucket = s3.Bucket(bucket_name)
+    filename, _ = os.path.splitext(file_path)
+    output_base = os.path.basename(filename)
+    my_bucket.delete_key(f'{output_base}.c4ga')
+
+
+def encrypt_file(file_path, recipient_pubkey, private_key, passphrase):
+    """Encrypt file."""
     filename, _ = os.path.splitext(file_path)
     output_file = os.path.expanduser(f'{filename}.c4ga')
+    # list of (method, privkey, recipient_pubkey=None)
+    # method supported is 0 https://github.com/EGA-archive/crypt4gh/blob/v1.0/crypt4gh/header.py#L261
+
+    def cb():
+        return passphrase
+
+    pubkey = get_public_key(recipient_pubkey)
+    seckey = get_private_key(private_key, cb)
+    keys = [(0, seckey, pubkey)]
     infile = open(file_path, 'rb')
     try:
-        encrypt(pubkey, infile, file_size, open(f'{filename}.c4ga', 'wb'))
-        LOG.debug(f'File {filename}.c4ga is the encrypted file.')
+        encrypt(keys, infile, open(f'{filename}.c4ga', 'wb'), offset=0, span=None)
+        print(f'File {filename}.c4ga is the encrypted file.')
     except Exception as e:
-        LOG.error(f'Something went wrong {e}')
+        print(f'Something went wrong {e}')
         raise e
     return output_file
