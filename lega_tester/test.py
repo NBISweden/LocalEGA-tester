@@ -95,20 +95,20 @@ def test_step_check_archive(config, fileID):
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
-def test_step_dataedge_download(config, filename, stableID, used_file):
-    """Test download from DataEdge service."""
-    # Verify that the file can be downloaded from DataEdge
-    # We are using a token that can be validated by DataEdge
+def test_step_doa_download(config, filename, stableID, used_file):
+    """Test download from doa service."""
+    # Verify that the file can be downloaded from doa
+    # We are using a token that can be validated by doa
     token = config['token']
-    dataedge_file = f'/volume/{filename}.dataedge'
+    doa_file = f'/volume/{filename}.doa'
     edge_payload = {'destinationFormat': 'plain'}
     edge_headers = {'Authorization': f'Bearer {token}'}  # No token no permissions
-    dataedge_url = f"https://{config['dataedge_address']}:{config['dataedge_port']}/files/{stableID}"
-    # download_to_file(dataedge_url, edge_payload, dataedge_file,
+    doa_url = f"https://{config['doa_address']}:{config['doa_port']}/files/{stableID}"
+    # download_to_file(doa_url, edge_payload, doa_file,
     #                  config['tls_cert_tester'],
     #                  config['tls_key_tester'], headers=edge_headers)
-    download_to_file(config['tls_ca_root_file'], dataedge_url, edge_payload, dataedge_file, headers=edge_headers)
-    compare_files('DataEdge', dataedge_file, used_file)
+    download_to_file(config['tls_ca_root_file'], doa_url, edge_payload, doa_file, headers=edge_headers)
+    compare_files('doa', doa_file, used_file)
 
 
 # FIXTURES
@@ -152,7 +152,7 @@ def fixture_step_encrypt(config, original_file):
 def fixture_step_completed(config, current_id, output_base):
     """Test if file has completed both in MQ and in DB."""
     # Once the file has been ingested it should be the last ID in the database
-    # We use this ID everywhere including donwload from DataEdge
+    # We use this ID everywhere including donwload from doa
     # In future versions once we fix DB schema we will use StableID for download
     cm_protocol = 'amqps' if config['cm_ssl'] else 'amqp'
     # wait for submission to go through
@@ -221,8 +221,8 @@ def dependency_make_cega_stableID(config, fileID, correlation_id, stableID):
 
 
 def dependency_map_file2dataset(config, fileID):
-    """Map file to dataset for retrieving file via dataedge."""
-    LOG.debug('Mapping file to dataset for retrieving file via dataedge.')
+    """Map file to dataset for retrieving file via doa."""
+    LOG.debug('Mapping file to dataset for retrieving file via doa.')
 
     # There is no component asigning permissions for files in datasets
     # Thus we need this step
@@ -297,7 +297,7 @@ def main():
     LOG.debug('-------------------------------------')
 
     dependency_map_file2dataset(config, fileID)
-    test_step_dataedge_download(config, filename, stableID, original_file)
+    test_step_doa_download(config, filename, stableID, original_file)
 
     LOG.debug('Outgestion DONE')
     LOG.debug('-------------------------------------')
