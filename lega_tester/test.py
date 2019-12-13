@@ -44,9 +44,9 @@ def test_step_upload(config, test_user, test_file):
     # Test Inbox Connection before anything
     if config['inbox_s3']:
         verify_s3_inbox_ssl = False
-        if config['inbox_s3_public'] and config['s3_ssl']:
+        if config['inbox_s3_public'] and config['inbox_s3_ssl']:
             verify_s3_inbox_ssl = True
-        elif config['s3_ssl']:
+        elif config['inbox_s3_ssl']:
             verify_s3_inbox_ssl = config['tls_ca_root_file']
         # Assumes each user has a bucket
         s3_connection(config['inbox_s3_address'], test_user,
