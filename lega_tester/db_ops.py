@@ -83,3 +83,19 @@ def file2dataset_map(db_user, db_name, db_pass, db_host, file_id, dataset_id, ss
         LOG.debug(f"Mapped ID: {file_id} to Dataset: {dataset_id}")
         conn.commit()
     conn.close()
+
+
+def retrieve_file_path(db_user, db_name, db_pass, db_host, file_id, ssl_enable):
+    """Retrieve the archive path of file in the database, indifferent of status."""
+    conn = psycopg2.connect(user=db_user, password=db_pass,
+                            database=db_name, host=db_host,
+                            # We might need to use `verify-ca`
+                            # but for standard ssl connection `require` is eneough
+                            sslmode='require' if ssl_enable else 'disable')
+    cursor = conn.cursor()
+    cursor.execute('SELECT archive_path FROM local_ega.files where id = %(file_id)s', {"file_id": file_id})
+    archive_path = cursor.fetchone()[0]
+    LOG.debug(f"Archive path: {archive_path}")
+    cursor.close()
+    conn.close()
+    return archive_path
