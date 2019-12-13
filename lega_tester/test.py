@@ -303,9 +303,12 @@ def main():
     LOG.debug('-------------------------------------')
 
     LOG.debug('Cleaning up ...')
-    sftp_remove(config['inbox_address'], test_user, test_file,
-                os.path.expanduser(config['user_key']),
-                port=int(config['inbox_port']))
+    if config['inbox_s3']:
+        LOG.debug("Need to clean up the inbox")
+    else:
+        sftp_remove(config['inbox_address'], test_user, test_file,
+                    os.path.expanduser(config['user_key']),
+                    port=int(config['inbox_port']))
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     LOG.info('Should be all!')
