@@ -9,7 +9,7 @@ import argparse
 import yaml
 from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
 from .archive_ops import list_s3_objects, check_file_exists
-from .db_ops import get_last_id, ensure_db_status, file2dataset_map
+from .db_ops import get_last_id, ensure_db_status, file2dataset_map, retrieve_file_path
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
 from pathlib import Path
@@ -68,8 +68,12 @@ def test_step_check_archive(config, fileID):
                         config['s3_ssl'],
                         config['tls_ca_root_file'])
     elif storage_type == "FileStorage":
-        assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
-        file_path = Path(f'/ega/archive/{fileID}')
+        archive_path = retrieve_file_path(config['db_in_user'], config['db_name'],
+                                          config['db_in_pass'], config['db_address'],
+                                          fileID,
+                                          config['db_ssl'])
+        file_path = Path(f"{config['data_storage_location']}/lega{archive_path}")
+        assert Path.is_file(file_path), f"Could not find the file just uploaded! | FAIL | "
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
@@ -79,8 +83,21 @@ def test_step_res_download(config, filename, fileID, used_file, session_key, iv)
     Not necessary but good to have and see before testing dataedge
     """
     # Verify that the file can be downloaded from RES using the session_key and IV
+    if 'data_storage_type' in config and config['data_storage_type']:
+        storage_type = config['data_storage_type']
+    else:
+        storage_type = "S3Storage"
+    if storage_type == "S3Storage":
+        file_path = fileID
+    elif storage_type == "FileStorage":
+        archive_path = retrieve_file_path(config['db_in_user'], config['db_name'],
+                                          config['db_in_pass'], config['db_address'],
+                                          fileID,
+                                          config['db_ssl'])
+        # file_path = f"{config['data_storage_location']}/lega{archive_path}"
+        file_path = archive_path
     res_file = f'/volume/{filename}.res'
-    res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': fileID}
+    res_payload = {'sourceKey': session_key, 'sourceIV': iv, 'filePath': file_path}
     res_url = f"https://{config['res_address']}:{config['res_port']}/file"
     # download_to_file(res_url, res_payload, res_file,
     #                  config['tls_cert_tester'],
