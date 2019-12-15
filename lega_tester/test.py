@@ -44,9 +44,9 @@ def test_step_upload(config, test_user, test_file):
     # Test Inbox Connection before anything
     if config['inbox_s3']:
         verify_s3_inbox_ssl = False
-        if config['inbox_s3_public'] and config['s3_ssl']:
+        if config['inbox_s3_public'] and config['inbox_s3_ssl']:
             verify_s3_inbox_ssl = True
-        elif config['s3_ssl']:
+        elif config['inbox_s3_ssl']:
             verify_s3_inbox_ssl = config['tls_ca_root_file']
         # Assumes each user has a bucket
         s3_connection(config['inbox_s3_address'], test_user,
@@ -303,9 +303,12 @@ def main():
     LOG.debug('-------------------------------------')
 
     LOG.debug('Cleaning up ...')
-    sftp_remove(config['inbox_address'], test_user, test_file,
-                os.path.expanduser(config['user_key']),
-                port=int(config['inbox_port']))
+    if config['inbox_s3']:
+        LOG.debug("Need to clean up the inbox")
+    else:
+        sftp_remove(config['inbox_address'], test_user, test_file,
+                    os.path.expanduser(config['user_key']),
+                    port=int(config['inbox_port']))
     fixture_step_purge(config)
     LOG.debug('-------------------------------------')
     LOG.info('Should be all!')
