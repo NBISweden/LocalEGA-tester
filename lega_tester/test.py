@@ -7,7 +7,7 @@ import argparse
 import yaml
 from .utils import download_to_file, compare_files, is_none_p, read_enc_file_values
 from .archive_ops import list_s3_objects, check_file_exists
-from .db_ops import get_last_id, ensure_db_status, file2dataset_map
+from .db_ops import get_last_id, ensure_db_status, file2dataset_map, retrieve_file_path
 from .mq_ops import submit_cega, get_corr, purge_cega_mq
 from .inbox_ops import encrypt_file, open_ssh_connection, sftp_upload, sftp_remove
 from .inbox_ops import s3_connection, s3_upload
@@ -90,8 +90,12 @@ def test_step_check_archive(config, fileID):
                         config['s3_ssl'],
                         verify_s3_ssl)
     elif storage_type == "FileStorage":
-        assert Path.is_file(f'/ega/archive/{fileID}'), f"Could not find the file just uploaded! | FAIL | "
-        file_path = Path(f'/ega/archive/{fileID}')
+        archive_path = retrieve_file_path(config['db_in_user'], config['db_name'],
+                                          config['db_in_pass'], config['db_address'],
+                                          fileID,
+                                          config['db_ssl'])
+        file_path = Path(f"{config['data_storage_location']}/lega{archive_path}")
+        assert Path.is_file(file_path), f"Could not find the file just uploaded! | FAIL | "
         LOG.debug(f'Found ingested file: {file_path.name} of size: {file_path.stat().st_size}.')
 
 
