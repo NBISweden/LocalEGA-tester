@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='lega_tester',
-    version='0.4.2',
+    version='0.4.3',
     packages=find_packages(),
     py_modules=['lega_tester'],
     include_package_data=True,
