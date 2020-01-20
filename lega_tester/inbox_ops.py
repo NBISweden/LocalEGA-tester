@@ -2,7 +2,7 @@ import paramiko
 import os
 import logging
 from tenacity import retry, stop_after_delay, wait_fixed
-from crypt4gh.engine import encrypt
+from crypt4gh.lib import encrypt
 from crypt4gh.keys import get_private_key, get_public_key
 import boto3
 

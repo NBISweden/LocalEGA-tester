@@ -21,7 +21,7 @@ setup(
         'requests',
         'psycopg2-binary',
         'tenacity',
-        'crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.0',
+        'crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.1',
     ],
     entry_points={
         'console_scripts': [
