@@ -5,6 +5,6 @@ paramiko
 boto3
 PyYAML
 requests
-crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.0
+crypt4gh @ git+https://github.com/EGA-archive/crypt4gh.git@v1.1
 psycopg2-binary
 tenacity
